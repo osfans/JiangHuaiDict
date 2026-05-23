@@ -33,11 +33,6 @@ jobs:
         run: |
           python build_huai_dict_site.py
 
-      - name: Prepare Pages artifact
-        run: |
-          mkdir -p dist
-          cp 淮语词典.html dist/index.html
-
       - name: Deploy to SF
         run: |
           sshpass -p '${{ secrets.SF_PASSWORD }}' scp -o StrictHostKeyChecking=no dist/index.html ${{ secrets.SF_USERNAME }}@web.sourceforge.net:/home/project-web/jianghuaidict/htdocs
