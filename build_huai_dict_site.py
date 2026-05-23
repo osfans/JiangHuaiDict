@@ -11,7 +11,7 @@ TEMPLATE = ROOT / "huai_dict_template.html"
 
 HEAD_RE = re.compile(r"^(?:【[^】]+】)+")
 WORD_RE = re.compile(r"【([^】]+)】")
-PINYIN_RE = re.compile(r"`([a-z][a-z0-9\- ,;/]*?)`")
+PINYIN_RE = re.compile(r"^([a-z][a-z0-9 ,;/\-]*)")
 
 def render_template(template_path: Path, replacements: dict[str, str]) -> str:
     tpl = template_path.read_text(encoding="utf-8")
@@ -111,11 +111,18 @@ def load_entries():
             references[dialect] = {"book": book, "author": author}
 
         for raw_line in lines:
-            entry = parse_entry(raw_line, dialect)
-            if entry and (entry["explanation"] or len(entry["heads"][0]) != 1):
-                if str(entry) not in uniq:
-                    entries.append(entry)
-                uniq.add(str(entry))
+            groups = re.findall(r"`([^`]+)`", raw_line)
+            inline_groups = len(groups) >= 1
+            if not inline_groups:
+                groups = [raw_line]
+            for group in groups:
+                if inline_groups and not HEAD_RE.match(group):
+                    group = f"【{group}】"
+                entry = parse_entry(group, dialect)
+                if entry and (entry["explanation"] or len(entry["heads"][0]) != 1):
+                    if str(entry) not in uniq:
+                        entries.append(entry)
+                    uniq.add(str(entry))
     return dialects, entries, references
 
 
@@ -126,9 +133,10 @@ def build_html(dialects, entries, references):
         [dialect_idx[e["dialect"]], e["heads"], e["pinyin"], e["explanation"]]
         for e in entries
     ]
-    indent = 2 if len(sys.argv) > 1 else None
     dialects_json = json.dumps(dialects, ensure_ascii=False, separators=(",", ":"))
-    data_json = json.dumps(records, ensure_ascii=False, separators=(",", ":"), indent=indent)
+    data_json = json.dumps(records, ensure_ascii=False, separators=(",", ":"))
+    if len(sys.argv) > 1:
+        json.dump(records, open("dump.json", "w", encoding="utf-8", newline="\n"), ensure_ascii=False, indent=2)
     total = len(entries)
     tz_utc8 = timezone(timedelta(hours=8))
     updated_at = datetime.now(tz_utc8).strftime("%Y年%m月%d号")
