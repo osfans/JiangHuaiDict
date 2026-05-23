@@ -11,8 +11,7 @@ TEMPLATE = ROOT / "huai_dict_template.html"
 
 HEAD_RE = re.compile(r"^(?:【[^】]+】)+")
 WORD_RE = re.compile(r"【([^】]+)】")
-PINYIN_RE = re.compile(r"`([^`]+)`")
-
+PINYIN_RE = re.compile(r"`([a-z][a-z0-9\- ,;/]*?)`")
 
 def render_template(template_path: Path, replacements: dict[str, str]) -> str:
     tpl = template_path.read_text(encoding="utf-8")
