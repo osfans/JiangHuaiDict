@@ -554,7 +554,7 @@ def build_html(dialects, entries, references):
       if (renderedCount < currentMatches.length) {{
         statsEl.textContent = `找到 ${{currentMatches.length}} 条，已显示 ${{renderedCount}} 条`;
       }} else {{
-        statsEl.textContent = `找到 ${{currentMatches.length}} 条（已全部显示）`;
+        statsEl.textContent = `找到 ${{currentMatches.length}} 条`;
       }}
     }}
 
