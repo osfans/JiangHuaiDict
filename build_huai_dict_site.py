@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import html
 import json
-import re
+import re, sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -129,8 +129,9 @@ def build_html(dialects, entries, references):
         [dialect_idx[e["dialect"]], e["heads"], e["pinyin"], e["explanation"]]
         for e in entries
     ]
+    indent = 2 if len(sys.argv) > 1 else None
     dialects_json = json.dumps(dialects, ensure_ascii=False, separators=(",", ":"))
-    data_json = json.dumps(records, ensure_ascii=False, separators=(",", ":"))
+    data_json = json.dumps(records, ensure_ascii=False, separators=(",", ":"), indent=indent)
     total = len(entries)
     tz_utc8 = timezone(timedelta(hours=8))
     updated_at = datetime.now(tz_utc8).strftime("%Y年%m月%d号")
@@ -162,7 +163,7 @@ def main():
     dialects, entries, references = load_entries()
     html = build_html(dialects, entries, references)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(html, encoding="utf-8")
+    OUTPUT.write_text(html, encoding="utf-8", newline="\n")
     size_bytes = OUTPUT.stat().st_size
     print(f"生成完成: {OUTPUT}")
     print(f"词条数: {len(entries)}")

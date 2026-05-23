@@ -108,7 +108,7 @@
     }
     .heads { font-size: 18px; color: #1e3a8a; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
     .heads-pinyin { font-size: 14px; color: var(--muted); }
-    .meta { font-size: 13px; color: var(--muted); margin-bottom: 0; line-height: 1.75; }
+    .exp { font-size: 14px; color: var(--muted); margin-bottom: 0; line-height: 1.75; white-space: pre-wrap; }
     .chip {
       display: inline-block;
       font-size: 12px;
@@ -124,9 +124,6 @@
       border-color: var(--chip-line-dyn, var(--chip-line));
       color: var(--chip-text-dyn, var(--chip-text));
     }
-    .exp { line-height: 1.75; white-space: pre-wrap; }
-    .meta-exp { color: var(--ink); margin-left: 8px; }
-    .meta-exp.meta-exp-only { margin-left: 0; }
     .hl {
       background: #ffe8a3;
       color: #5f3d00;
@@ -498,23 +495,18 @@
         listEl.innerHTML = '';
       }
       const fragments = items.map(item => {
-        const heads = renderHeads(item.heads, currentQuery);
+        const heads = `<span>${renderHeads(item.heads, currentQuery)}</span>`;
+        const dialect = renderDynamicChip(item.dialect);
         const pinyin = (item.pinyin && item.pinyin.length)
-          ? `<span class="heads-pinyin">${highlightText(item.pinyin.join(' ; '), currentQuery)}</span>`
+          ? `<span class="heads-pinyin">${highlightText(item.pinyin.join('; '), currentQuery)}</span>`
           : '';
-        const showDialectChip = item.dialect !== '词表';
-        const dialect = showDialectChip ? renderDynamicChip(item.dialect) : '';
-        const hasExp = !!(item.explanation && item.explanation.trim());
-        const exp = hasExp ? renderExplanation(item.explanation, currentQuery) : '';
-        const headsTail = hasExp ? pinyin : `${pinyin}${dialect}`;
-        const metaExpClass = showDialectChip ? 'meta-exp' : 'meta-exp meta-exp-only';
-        const meta = hasExp
-          ? `<div class="meta">${dialect}<span class="${metaExpClass}">${exp}</span></div>`
+        const exp = !!(item.explanation && item.explanation.trim())
+          ? `<div class="exp">${renderExplanation(item.explanation, currentQuery)}</div>`
           : '';
         return `
           <article class="item">
-            <div class="heads"><span>${heads}</span>${headsTail}</div>
-            ${meta}
+            <div class="heads">${heads}${pinyin}${dialect}</div>
+            ${exp}
           </article>
         `;
       });
