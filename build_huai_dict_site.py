@@ -55,8 +55,6 @@ def dialect_chip_style(dialect: str) -> str:
     )
 
 def clean_line(line: str) -> str:
-    # 按要求忽略所有〓符号
-    line = line.replace("〓", "")
     line = line.replace(r"\\u3000", " ")
     line = line.replace("（", "(").replace("）", ")")
     if line.startswith("- ") or line.startswith("1. "):
