@@ -176,6 +176,27 @@ def build_html(entries):
       padding: 0 2px;
       border-radius: 4px;
     }}
+    .head-mark-single {{
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }}
+    .head-mark-double {{
+      text-decoration: underline;
+      text-decoration-style: double;
+      text-underline-offset: 3px;
+    }}
+    .head-mark-wave {{
+      text-decoration: underline;
+      text-decoration-style: wavy;
+      text-underline-offset: 3px;
+    }}
+    .head-mark-emphasis {{
+      text-emphasis: dot;
+      text-emphasis-position: under;
+      -webkit-text-emphasis: dot;
+      -webkit-text-emphasis-position: under;
+    }}
     .empty {{
       text-align: center;
       color: var(--muted);
@@ -209,6 +230,10 @@ def build_html(entries):
 
     const DIALECTS = {dialects_json};
     const RAW = {data_json};
+    function stripHeadMarkers(s) {{
+      return String(s || '').replace(/[-=?+]/g, '');
+    }}
+
     const DATA = RAW.map(r => ({{
       dialect: DIALECTS[r[0]],
       heads: r[1] || [],
@@ -217,9 +242,9 @@ def build_html(entries):
     }}));
     const INDEXED = DATA.map(item => (({{
       ...item,
-      headText: item.heads.join(' ').toLowerCase(),
+      headText: item.heads.map(stripHeadMarkers).join(' ').toLowerCase(),
       fullText: [
-        item.heads.join(' '),
+        item.heads.map(stripHeadMarkers).join(' '),
         (item.pinyin || []).join(' '),
         item.explanation || ''
       ].join(' ').toLowerCase()
@@ -336,12 +361,78 @@ def build_html(entries):
       return result;
     }}
 
+    function markerToClass(marker) {{
+      if (marker === '-') return 'head-mark-single';
+      if (marker === '=') return 'head-mark-double';
+      if (marker === '?') return 'head-mark-wave';
+      if (marker === '+') return 'head-mark-emphasis';
+      return '';
+    }}
+
+    function renderHeadWord(word, rawQuery) {{
+      const tokens = [];
+      for (const ch of String(word || '')) {{
+        if ((ch === '-' || ch === '=' || ch === '?' || ch === '+') && tokens.length) {{
+          tokens[tokens.length - 1].mark = ch;
+        }} else {{
+          tokens.push({{ ch, mark: '' }});
+        }}
+      }}
+
+      const src = tokens.map(t => t.ch).join('');
+      const keyword = (rawQuery || '').trim();
+      if (!keyword) {{
+        return tokens.map(t => {{
+          const cls = markerToClass(t.mark);
+          const ch = escapeHtml(t.ch);
+          return cls ? `<span class="${{cls}}">${{ch}}</span>` : ch;
+        }}).join('');
+      }}
+
+      const segs = keyword.split(/\\s+/).filter(Boolean);
+      const pattern = segs.length <= 1
+        ? new RegExp(escapeRegExp(keyword), 'ig')
+        : new RegExp(segs.slice().sort((a, b) => b.length - a.length).map(escapeRegExp).join('|'), 'ig');
+
+      const ranges = [];
+      let m;
+      while ((m = pattern.exec(src)) !== null) {{
+        ranges.push([m.index, m.index + m[0].length]);
+      }}
+
+      if (!ranges.length) {{
+        return tokens.map(t => {{
+          const cls = markerToClass(t.mark);
+          const ch = escapeHtml(t.ch);
+          return cls ? `<span class="${{cls}}">${{ch}}</span>` : ch;
+        }}).join('');
+      }}
+
+      let out = '';
+      let r = 0;
+      for (let i = 0; i < tokens.length; i += 1) {{
+        while (r < ranges.length && i >= ranges[r][1]) r += 1;
+        if (r < ranges.length && i === ranges[r][0]) out += '<mark class="hl">';
+
+        const cls = markerToClass(tokens[i].mark);
+        const ch = escapeHtml(tokens[i].ch);
+        out += cls ? `<span class="${{cls}}">${{ch}}</span>` : ch;
+
+        if (r < ranges.length && i + 1 === ranges[r][1]) out += '</mark>';
+      }}
+      return out;
+    }}
+
+    function renderHeads(heads, rawQuery) {{
+      return (heads || []).map(h => renderHeadWord(h, rawQuery)).join(' / ');
+    }}
+
     function renderChunk(items, append = false) {{
       if (!append) {{
         listEl.innerHTML = '';
       }}
       const fragments = items.map(item => {{
-        const heads = highlightText(item.heads.join(' / '), currentQuery);
+        const heads = renderHeads(item.heads, currentQuery);
         const pinyin = (item.pinyin && item.pinyin.length)
           ? `<span class="heads-pinyin">${{highlightText(item.pinyin.join(' ; '), currentQuery)}}</span>`
           : '';
