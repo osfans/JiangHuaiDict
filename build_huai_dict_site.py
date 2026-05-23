@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import html
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -11,6 +12,21 @@ HEAD_RE = re.compile(r"^(?:【[^】]+】)+")
 WORD_RE = re.compile(r"【([^】]+)】")
 PINYIN_RE = re.compile(r"`([^`]+)`")
 
+
+def strip_reference_prefix(line: str) -> str:
+  s = (line or "").strip()
+  s = re.sub(r"^\s*#+\s*", "", s)
+  s = re.sub(r"^\s*[-*+]\s*", "", s)
+  s = re.sub(r"^\s*\d+[.)、]\s*", "", s)
+  s = re.sub(r"^\s*(?:参考书目|书目|资料来源)\s*[:：]\s*", "", s)
+  return s.strip()
+
+def dialect_chip_class(dialect: str) -> str:
+    name = re.sub(r"\d+$", "", dialect)
+    acc = 0
+    for i, ch in enumerate(name):
+        acc = (acc + ord(ch) * (i + 1)) % 8
+    return f"c{acc}"
 
 def clean_line(line: str) -> str:
     # 按要求忽略所有〓符号
@@ -49,22 +65,33 @@ def parse_entry(line: str, dialect: str):
 
 
 def load_entries():
+    dialects = []
     entries = []
+    references = {}
     uniq = set()
     for md_path in sorted(ROOT.glob("*.md")):
-        dialect = md_path.stem
+        dialect = md_path.stem.lstrip("0123456789")
+        dialects.append(dialect)
         text = md_path.read_text(encoding="utf-8", errors="ignore")
-        for raw_line in text.splitlines():
+        lines = text.splitlines()
+
+        first_line = lines[0].strip() if lines else ""
+        book = strip_reference_prefix(first_line)
+        second_line = lines[1].strip() if len(lines) > 1 else ""
+        author = second_line if second_line else ""
+        if book or author:
+            references[dialect] = {"book": book, "author": author}
+
+        for raw_line in lines:
             entry = parse_entry(raw_line, dialect)
             if entry and (entry["explanation"] or len(entry["heads"][0]) != 1):
                 if str(entry) not in uniq:
                     entries.append(entry)
                 uniq.add(str(entry))
-    return entries
+    return dialects, entries, references
 
 
-def build_html(entries):
-    dialects = sorted({e["dialect"] for e in entries})
+def build_html(dialects, entries, references):
     dialect_idx = {d: i for i, d in enumerate(dialects)}
     # 紧凑编码: [方言索引, 词头数组, 拼音数组, 释义]
     records = [
@@ -76,6 +103,18 @@ def build_html(entries):
     total = len(entries)
     tz_utc8 = timezone(timedelta(hours=8))
     updated_at = datetime.now(tz_utc8).strftime("%Y年%m月%d号")
+    ref_rows = []
+    for d in list(references):
+      book = references[d].get("book", "")
+      author = references[d].get("author", "")
+      chip_class = dialect_chip_class(d)
+      author_html = (
+        f'<span class="ref-author">（{html.escape(author)}）</span>' if author else ""
+      )
+      ref_rows.append(
+        f'<li><span class="chip {chip_class}">{html.escape(d)}</span><span class="ref-sep"> </span><span class="ref-book">{html.escape(book)}</span>{author_html}</li>'
+      )
+    refs_html = "\n".join(ref_rows) if ref_rows else '<li>暂无参考资料信息</li>'
     return f"""<!doctype html>
 <html lang=\"zh-CN\">
 <head>
@@ -107,6 +146,43 @@ def build_html(entries):
     .wrap {{ max-width: 1100px; margin: 0 auto; padding: 24px 16px 36px; }}
     h1 {{ margin: 0 0 8px; font-size: 34px; line-height: 1.2; }}
     .sub {{ color: var(--muted); margin-bottom: 16px; }}
+    .ref-panel {{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+    }}
+    .ref-title {{
+      color: #1e3a8a;
+      font-weight: 700;
+      margin-bottom: 8px;
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+    }}
+    .ref-title::-webkit-details-marker {{
+      display: none;
+    }}
+    .ref-title::before {{
+      content: '▸';
+      display: inline-block;
+      margin-right: 6px;
+      transition: transform 0.15s ease;
+    }}
+    .ref-panel[open] .ref-title::before {{
+      transform: rotate(90deg);
+    }}
+    .ref-list {{
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }}
+    .ref-book {{ color: #30476f; }}
+    .ref-author {{ color: var(--muted); margin-left: 4px; }}
     .panel {{
       background: var(--card);
       border: 1px solid var(--line);
@@ -212,6 +288,13 @@ def build_html(entries):
     <h1>淮语词典</h1>
     <div class=\"sub\">共<span id=\"allCount\">{total}</span>个词，<span id=\"updatedAt\">{updated_at}</span>更新</div>
 
+    <details class="ref-panel">
+      <summary class="ref-title">参考书目</summary>
+      <ul class=\"ref-list\">
+        {refs_html}
+      </ul>
+    </details>
+
     <div class=\"panel\">
       <div class=\"controls\">
         <label class=\"check\" for=\"headOnly\"><input id=\"headOnly\" type=\"checkbox\" checked />仅词头</label>
@@ -261,13 +344,19 @@ def build_html(entries):
     let currentQuery = '';
 
     const dialects = DIALECTS.slice();
+    const displayDialects = [...new Set(dialects.map(displayDialect))];
     dialectEl.innerHTML = ['<option value="">全部方言</option>']
-      .concat(dialects.map(d => `<option value="${{d}}">${{d}}</option>`)).join('');
+      .concat(displayDialects.map(d => `<option value="${{d}}">${{d}}</option>`)).join('');
+
+    function displayDialect(d) {{
+      return String(d || '').replace(/\\d+$/, '');
+    }}
 
     function dialectClass(dialect) {{
+      const name = displayDialect(dialect);
       let acc = 0;
-      for (let i = 0; i < dialect.length; i += 1) {{
-        acc = (acc + dialect.charCodeAt(i) * (i + 1)) % 8;
+      for (let i = 0; i < name.length; i += 1) {{
+        acc = (acc + name.charCodeAt(i) * (i + 1)) % 8;
       }}
       return `c${{acc}}`;
     }}
@@ -300,7 +389,7 @@ def build_html(entries):
     }}
 
     function match(entry, q, dialect, headOnly) {{
-      if (dialect && entry.dialect !== dialect) return false;
+      if (dialect && displayDialect(entry.dialect) !== dialect) return false;
       if (!q) return true;
       if (isPinyinQuery(q)) {{
         return matchPinyin(entry, q.trim());
@@ -570,11 +659,13 @@ def build_html(entries):
 
 
 def main():
-    entries = load_entries()
-    html = build_html(entries)
+    dialects, entries, references = load_entries()
+    html = build_html(dialects, entries, references)
     OUTPUT.write_text(html, encoding="utf-8")
+    size_bytes = OUTPUT.stat().st_size
     print(f"生成完成: {OUTPUT}")
     print(f"词条数: {len(entries)}")
+    print(f"HTML大小: {size_bytes} bytes ({size_bytes / (1024 * 1024):.2f} MB)")
 
 
 if __name__ == "__main__":
