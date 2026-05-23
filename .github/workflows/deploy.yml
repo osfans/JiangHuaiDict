@@ -17,6 +17,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,6 +37,10 @@ jobs:
         run: |
           mkdir -p dist
           cp 淮语词典.html dist/index.html
+
+      - name: Deploy to SF
+        run: |
+          sshpass -p '${{ secrets.SF_PASSWORD }}' scp -o StrictHostKeyChecking=no dist/index.html ${{ secrets.SF_USERNAME }}@web.sourceforge.net:/home/project-web/jianghuaidict/htdocs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
