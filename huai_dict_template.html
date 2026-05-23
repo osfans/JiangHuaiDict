@@ -119,16 +119,14 @@
       padding: 1px 4px;
       margin-right: 2px;
     }
-    .chip.c0 { background: #eaf7ff; border-color: #b6def7; color: #0b5e8e; }
-    .chip.c1 { background: #eafaf3; border-color: #b8ebd0; color: #176b45; }
-    .chip.c2 { background: #fff6e8; border-color: #f1d7ac; color: #8c5b15; }
-    .chip.c3 { background: #fff0f4; border-color: #f1c3d2; color: #8b2d4f; }
-    .chip.c4 { background: #f0efff; border-color: #ccc8f7; color: #3f3aa3; }
-    .chip.c5 { background: #e9f8f8; border-color: #b5e3e3; color: #116e72; }
-    .chip.c6 { background: #fff2ea; border-color: #f3cbb8; color: #8a3f1e; }
-    .chip.c7 { background: #f4f7ea; border-color: #d7e1b6; color: #556b1f; }
+    .chip.chip-dynamic {
+      background: var(--chip-bg, var(--chip));
+      border-color: var(--chip-line-dyn, var(--chip-line));
+      color: var(--chip-text-dyn, var(--chip-text));
+    }
     .exp { line-height: 1.75; white-space: pre-wrap; }
     .meta-exp { color: var(--ink); margin-left: 8px; }
+    .meta-exp.meta-exp-only { margin-left: 0; }
     .hl {
       background: #ffe8a3;
       color: #5f3d00;
@@ -143,17 +141,19 @@
     .head-mark-double {
       text-decoration: underline;
       text-decoration-style: double;
+      text-decoration-thickness: 1px;
       text-underline-offset: 3px;
     }
     .head-mark-wave {
       text-decoration: underline;
       text-decoration-style: wavy;
+      text-decoration-thickness: 1px;
       text-underline-offset: 3px;
     }
     .head-mark-emphasis {
-      text-emphasis: dot;
+      text-emphasis: triangle;
       text-emphasis-position: under;
-      -webkit-text-emphasis: dot;
+      -webkit-text-emphasis: triangle;
       -webkit-text-emphasis-position: under;
     }
     .head-ruby rt {
@@ -207,7 +207,7 @@
     const DIALECTS = __DIALECTS_JSON__;
     const RAW = __DATA_JSON__;
     function normalizeHeadForSearch(s) {
-      return stripHeadMarkers(String(s || '').replace(/[（(][^（）()]*[）)]/g, ''));
+      return stripHeadMarkers(String(s || '').replace(/(.)[(][^()]*[)]/g, '$1'));
     }
 
     function stripHeadMarkers(s) {
@@ -249,13 +249,35 @@
       return String(d || '').replace(/\d+$/, '');
     }
 
-    function dialectClass(dialect) {
-      const name = displayDialect(dialect);
-      let acc = 0;
-      for (let i = 0; i < name.length; i += 1) {
-        acc = (acc + name.charCodeAt(i) * (i + 1)) % 8;
+    function stableHash(text) {
+      const src = String(text || '');
+      let h = 2166136261;
+      for (let i = 0; i < src.length; i += 1) {
+        h ^= src.charCodeAt(i);
+        h = Math.imul(h, 16777619);
       }
-      return `c${acc}`;
+      return h >>> 0;
+    }
+
+    function chipStyleVars(label) {
+      const seed = stableHash(String(label || ''));
+      const hue = seed % 360;
+      const satBg = 68 + (seed % 10);
+      const satLine = 42 + ((seed >> 3) % 16);
+      const satText = 56 + ((seed >> 5) % 18);
+      const lightBg = 93 - ((seed >> 7) % 5);
+      const lightLine = 76 - ((seed >> 11) % 8);
+      const lightText = 26 + ((seed >> 13) % 8);
+      return [
+        `--chip-bg:hsl(${hue} ${satBg}% ${lightBg}%);`,
+        `--chip-line-dyn:hsl(${hue} ${satLine}% ${lightLine}%);`,
+        `--chip-text-dyn:hsl(${hue} ${satText}% ${lightText}%);`
+      ].join('');
+    }
+
+    function renderDynamicChip(label) {
+      const safeLabel = escapeChip(String(label || ''));
+      return `<span class="chip chip-dynamic" style="${chipStyleVars(label)}">${safeLabel}</span>`;
     }
 
     function norm(s) {
@@ -305,7 +327,7 @@
       const keyword = (rawQuery || '').trim();
       if (!keyword) return escapeHtml(src);
 
-      // 多分段高亮（如 zz zo）
+      // 多分段高亮，如 zz zo
       const segs = keyword.split(/\s+/).filter(Boolean);
       if (segs.length <= 1) {
         const pattern = new RegExp(escapeRegExp(keyword), 'ig');
@@ -378,10 +400,9 @@
           tokens[tokens.length - 1].mark = ch;
           continue;
         }
-        if (ch === '(' || ch === '（') {
-          const closing = ch === '(' ? ')' : '）';
+        if (ch === '(') {
           let end = i + 1;
-          while (end < text.length && text[end] !== closing) end += 1;
+          while (end < text.length && text[end] !== ')') end += 1;
           const content = text.slice(i + 1, end < text.length ? end : text.length).trim();
           if (content) {
             const annotation = splitHeadAnnotation(content);
@@ -481,12 +502,14 @@
         const pinyin = (item.pinyin && item.pinyin.length)
           ? `<span class="heads-pinyin">${highlightText(item.pinyin.join(' ; '), currentQuery)}</span>`
           : '';
-        const dialect = `<span class="chip ${dialectClass(item.dialect)}">${escapeChip(item.dialect)}</span>`;
+        const showDialectChip = item.dialect !== '词表';
+        const dialect = showDialectChip ? renderDynamicChip(item.dialect) : '';
         const hasExp = !!(item.explanation && item.explanation.trim());
-        const exp = hasExp ? highlightText(item.explanation, currentQuery) : '';
+        const exp = hasExp ? renderExplanation(item.explanation, currentQuery) : '';
         const headsTail = hasExp ? pinyin : `${pinyin}${dialect}`;
+        const metaExpClass = showDialectChip ? 'meta-exp' : 'meta-exp meta-exp-only';
         const meta = hasExp
-          ? `<div class="meta">${dialect}<span class="meta-exp">${exp}</span></div>`
+          ? `<div class="meta">${dialect}<span class="${metaExpClass}">${exp}</span></div>`
           : '';
         return `
           <article class="item">
@@ -500,6 +523,40 @@
       } else {
         listEl.innerHTML = fragments.join('');
       }
+    }
+
+    function renderExplanation(explanation, rawQuery) {
+      const src = String(explanation || '');
+      if (!src) return '';
+      const regex = /〔([^〕]+)〕/g;
+      let last = 0;
+      let out = '';
+      let m;
+      while ((m = regex.exec(src)) !== null) {
+        if (m.index > last) {
+          out += highlightText(src.slice(last, m.index), rawQuery);
+        }
+
+        // 标签和普通文字之间补空格；连续标签之间不补。
+        const prevChar = m.index > 0 ? src[m.index - 1] : '';
+        if (prevChar && !/\s/.test(prevChar) && prevChar !== '〕') {
+          out += ' ';
+        }
+
+        out += renderDynamicChip(m[1]);
+
+        const nextIndex = m.index + m[0].length;
+        const nextChar = nextIndex < src.length ? src[nextIndex] : '';
+        if (nextChar && !/\s/.test(nextChar) && nextChar !== '〔') {
+          out += ' ';
+        }
+
+        last = m.index + m[0].length;
+      }
+      if (last < src.length) {
+        out += highlightText(src.slice(last), rawQuery);
+      }
+      return out;
     }
 
     function updateStats() {

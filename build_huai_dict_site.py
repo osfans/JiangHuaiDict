@@ -32,17 +32,37 @@ def strip_reference_prefix(line: str) -> str:
 def dialect_chip_escape(dialect: str) -> str:
     return re.sub(r"(\d+)$", "<small>\\1</small>", dialect)
 
-def dialect_chip_class(dialect: str) -> str:
-    name = re.sub(r"\d+$", "", dialect)
-    acc = 0
-    for i, ch in enumerate(name):
-        acc = (acc + ord(ch) * (i + 1)) % 8
-    return f"c{acc}"
+def stable_hash(text: str) -> int:
+    h = 2166136261
+    for ch in text:
+        h ^= ord(ch)
+        h = (h * 16777619) & 0xFFFFFFFF
+    return h
+
+
+def dialect_chip_style(dialect: str) -> str:
+    seed = stable_hash(dialect)
+    hue = seed % 360
+    sat_bg = 68 + (seed % 10)
+    sat_line = 42 + ((seed >> 3) % 16)
+    sat_text = 56 + ((seed >> 5) % 18)
+    light_bg = 93 - ((seed >> 7) % 5)
+    light_line = 76 - ((seed >> 11) % 8)
+    light_text = 26 + ((seed >> 13) % 8)
+    return (
+        f"--chip-bg:hsl({hue} {sat_bg}% {light_bg}%);"
+        f"--chip-line-dyn:hsl({hue} {sat_line}% {light_line}%);"
+        f"--chip-text-dyn:hsl({hue} {sat_text}% {light_text}%);"
+    )
 
 def clean_line(line: str) -> str:
     # 按要求忽略所有〓符号
     line = line.replace("〓", "")
     line = line.replace(r"\\u3000", " ")
+    line = line.replace("（", "(").replace("）", ")")
+    if line.startswith("- ") or line.startswith("1. "):
+        line = line[2:].strip()
+        if "【" not in line: line = f"【{line}】"
     return line.strip()
 
 
@@ -116,15 +136,15 @@ def build_html(dialects, entries, references):
     updated_at = datetime.now(tz_utc8).strftime("%Y年%m月%d号")
     ref_rows = []
     for d in list(references):
-      book = references[d].get("book", "")
-      author = references[d].get("author", "")
-      chip_class = dialect_chip_class(d)
-      author_html = (
-        f'<span class="ref-author">（{html.escape(author)}）</span>' if author else ""
-      )
-      ref_rows.append(
-        f'<li><span class="chip {chip_class}">{dialect_chip_escape(html.escape(d))}</span><span class="ref-sep"> </span><span class="ref-book">{html.escape(book)}</span>{author_html}</li>'
-      )
+                book = references[d].get("book", "")
+                author = references[d].get("author", "")
+                author_html = (
+                        f'<span class="ref-author">（{html.escape(author)}）</span>' if author else ""
+                )
+                chip_style = dialect_chip_style(d)
+                ref_rows.append(
+                        f'<li><span class="chip chip-dynamic" style="{chip_style}">{dialect_chip_escape(html.escape(d))}</span><span class="ref-sep"> </span><span class="ref-book">{html.escape(book)}</span>{author_html}</li>'
+                )
     refs_html = "\n".join(ref_rows) if ref_rows else '<li>暂无参考资料信息</li>'
     return render_template(
             TEMPLATE,
