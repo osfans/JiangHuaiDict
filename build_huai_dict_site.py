@@ -147,6 +147,7 @@ def build_html(dialects, entries, references):
                 author_html = (
                         f'<span class="ref-author">（{html.escape(author)}）</span>' if author else ""
                 )
+                author_html = re.sub("〔(.*?)〕", lambda m: f' <span class="chip chip-dynamic" style="{dialect_chip_style(m.group(1))}">{html.escape(m.group(1))}</span> ', author_html)
                 chip_style = dialect_chip_style(d)
                 ref_rows.append(
                         f'<li><span class="chip chip-dynamic" style="{chip_style}">{dialect_chip_escape(html.escape(d))}</span><span class="ref-sep"> </span><span class="ref-book">{html.escape(book)}</span>{author_html}</li>'
