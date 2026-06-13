@@ -3,6 +3,8 @@ import json
 import re, sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from opencc import OpenCC
+cc = OpenCC('t2s')
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT = ROOT / "dist" / "index.html"
@@ -28,7 +30,9 @@ def strip_reference_prefix(line: str) -> str:
     return s.strip()
 
 def norm_line(line):
-    return line.replace(r"\\u3000", " ").replace("（", "(").replace("）", ")").replace("～", "~").replace("：", ":").replace("；", ";").replace("，", ",").replace("！", "!").replace("？", "?").strip()
+    line = line.replace(r"\\u3000", " ").replace("（", "(").replace("）", ")").replace("～", "~").replace("：", ":").replace("；", ";").replace("，", ",").replace("！", "!").replace("？", "?").strip()
+    line = cc.convert(line)
+    return line
 
 
 def clean_line(line: str) -> str:
@@ -36,8 +40,6 @@ def clean_line(line: str) -> str:
     if line.startswith("- ") or line.startswith("1. "):
         line = line[2:].strip()
         if "【" not in line: line = f"【{line}】"
-    if "【" not in line and not line.startswith("#") and "——" in line:
-        line = re.sub("^(.*?)——", "【\\1】", line)
     return line.strip()
 
 
@@ -71,7 +73,6 @@ def parse_md(line: str, dialect: str):
     }
 
 def parse_tsv(line: str, dialect: str):
-    line = norm_line(line)
     count = line.count("\t")
     if count == 0: return None
     if count == 1:
@@ -117,6 +118,7 @@ def load_entries():
             references[dialect] = {"book": book, "author": author}
 
         for raw_line in lines:
+            raw_line = norm_line(raw_line)
             groups = re.findall(r"`([^`]+)`", raw_line)
             inline_groups = len(groups) >= 1
             if not inline_groups:

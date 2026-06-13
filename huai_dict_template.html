@@ -107,8 +107,8 @@
       background: #fff;
     }
     .heads { font-size: 18px; color: #1e3a8a; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
-    .heads-pinyin { font-size: 14px; color: var(--muted); }
-    .exp { font-size: 14px; color: var(--ink); margin-bottom: 0; line-height: 1.75; white-space: pre-wrap; }
+    .heads-pinyin { font-size: 12px; color: var(--muted); }
+    .exp { font-size: 15px; color: var(--ink); margin-bottom: 0; line-height: 1.75; white-space: pre-wrap; }
     .chip {
       display: inline-block;
       font-size: 12px;
@@ -171,6 +171,13 @@
       color: var(--muted);
       padding: 28px 0;
     }
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.8rem;
+      color: #4a6a8a;
+      border-top: 1px solid #c0d8ee;
+    }
     @media (max-width: 760px) {
       .controls { grid-template-columns: 1fr; }
     }
@@ -197,6 +204,7 @@
       <div class="list" id="list"></div>
     </div>
   </div>
+  <footer><a href="https://github.com/osfans/JiangHuaiDict">淮语字典@GitHub</a></footer>
 
   <script>
     const CHUNK_SIZE = 200;
@@ -573,6 +581,7 @@
       if (last < src.length) {
         out += highlightText(src.slice(last), query);
       }
+      out = out.replace('{', '<sub>').replace('}', '</sub>');
       return out;
     }
 

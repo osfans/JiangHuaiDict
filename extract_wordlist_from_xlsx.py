@@ -3,6 +3,8 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 from collections import defaultdict
+from opencc import OpenCC
+cc = OpenCC("t2s")
 
 
 ROOT = Path(__file__).resolve().parent
@@ -13,7 +15,7 @@ OUTPUT_MD = ROOT / "000词表.md"
 def as_text(value) -> str:
     if value is None:
         return ""
-    return str(value).strip()
+    return cc.convert(str(value).strip())
 
 
 def build_wordlist() -> list[str]:
