@@ -36,6 +36,8 @@ def clean_line(line: str) -> str:
     if line.startswith("- ") or line.startswith("1. "):
         line = line[2:].strip()
         if "【" not in line: line = f"【{line}】"
+    if "【" not in line and not line.startswith("#") and "——" in line:
+        line = re.sub("^(.*?)——", "【\\1】", line)
     return line.strip()
 
 
@@ -59,6 +61,7 @@ def parse_md(line: str, dialect: str):
     # 释义里去掉拼音片段，保留其他信息
     explanation = PINYIN_RE.sub("", rest)
     explanation = re.sub(r"\s+", " ", explanation).strip(" -:\u3000")
+    explanation = re.sub(r"^([名动形代副量叹连介助语拟])[容气声]?词[ ,]?", "\\1\u20DE", explanation)
 
     return {
         "dialect": dialect,
@@ -85,19 +88,30 @@ def parse_tsv(line: str, dialect: str):
 
 def load_entries():
     dialects = []
+    seen_dialects = set()
     entries = []
     references = {}
     uniq = set()
+
+    def add_dialect(name: str):
+        n = (name or '').strip()
+        if not n or n in seen_dialects:
+            return
+        seen_dialects.add(n)
+        dialects.append(n)
+
     for md_path in sorted(ROOT.glob("[0-9]*.*")):
         is_tsv = md_path.suffix == ".tsv"
         dialect = md_path.stem.lstrip("0123456789")
-        dialects.append(dialect)
+        add_dialect(dialect)
         text = md_path.read_text(encoding="utf-8", errors="ignore")
         lines = text.splitlines()
 
         first_line = lines[0].strip() if lines else ""
         book = strip_reference_prefix(first_line)
         second_line = lines[1].strip() if len(lines) > 1 else ""
+        for tag in re.findall(r"〔([^〕]+)〕", second_line):
+            add_dialect(tag)
         author = second_line if second_line else ""
         if book or author:
             references[dialect] = {"book": book, "author": author}

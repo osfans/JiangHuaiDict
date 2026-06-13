@@ -259,7 +259,7 @@
     }
 
     function chipStyleVars(label) {
-      const seed = stableHash(String(label || ''));
+      const seed = stableHash(displayDialect(String(label || '')));
       const hue = seed % 360;
       const satBg = 68 + (seed % 10);
       const satLine = 42 + ((seed >> 3) % 16);
@@ -307,7 +307,11 @@
     }
 
     function match(entry, q, dialect, headOnly) {
-      if (dialect && displayDialect(entry.dialect) !== dialect) return false;
+      if (dialect) {
+        const selfDialectMatched = displayDialect(entry.dialect) === dialect;
+        const explanationDialectMatched = containsDialectTag(entry.explanation, dialect);
+        if (!selfDialectMatched && !explanationDialectMatched) return false;
+      }
       if (!q) return true;
       if (isPinyinQuery(q)) {
         return matchPinyin(entry, q.trim());
@@ -319,6 +323,14 @@
 
     function escapeRegExp(s) {
       return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function containsDialectTag(explanation, dialect) {
+      const exp = String(explanation || '');
+      const name = String(dialect || '').trim();
+      if (!name) return false;
+      const pattern = new RegExp(`〔\\s*${escapeRegExp(name)}\\s*〕`);
+      return pattern.test(exp);
     }
 
     function highlightText(text, rawQuery) {
@@ -388,13 +400,13 @@
 
     function splitHeadAnnotation(content) {
       const text = String(content || '').trim();
-      const match = text.match(/^([A-Za-z0-9]+)(.*)$/);
+      const match = text.match(/^(.*?)([A-Za-z0-9\-]+)$/);
       if (!match) {
         return { ruby: '', note: text };
       }
       return {
-        ruby: match[1],
-        note: (match[2] || '').trim()
+        ruby: match[2],
+        note: (match[1] || '').trim()
       };
     }
 
@@ -499,7 +511,7 @@
     }
 
     function renderHeads(heads, rawQuery) {
-      return (heads || []).map(h => renderHeadWord(h, rawQuery)).join(' / ');
+      return toFullWidth((heads || []).map(h => renderHeadWord(h, rawQuery)).join('、'));
     }
 
     function renderChunk(items, append = false) {
