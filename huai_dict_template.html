@@ -368,6 +368,16 @@
       return result;
     }
 
+    function toFullWidth(text) {
+      return String(text || '')
+        .replace(/~/g, '～')
+        .replace(/:/g, '：')
+        .replace(/;/g, '；')
+        .replace(/,/g, '，')
+        .replace(/!/g, '！')
+        .replace(/\?/g, '？');
+    }
+
     function markerToClass(marker) {
       if (marker === '-') return 'head-mark-single';
       if (marker === '=') return 'head-mark-double';
@@ -520,15 +530,16 @@
     }
 
     function renderExplanation(explanation, rawQuery) {
-      const src = String(explanation || '');
+      const src = toFullWidth(String(explanation || ''));
       if (!src) return '';
+      const query = toFullWidth(String(rawQuery || ''));
       const regex = /〔([^〕]+)〕/g;
       let last = 0;
       let out = '';
       let m;
       while ((m = regex.exec(src)) !== null) {
         if (m.index > last) {
-          out += highlightText(src.slice(last, m.index), rawQuery);
+          out += highlightText(src.slice(last, m.index), query);
         }
 
         // 标签和普通文字之间补空格；连续标签之间不补。
@@ -548,7 +559,7 @@
         last = m.index + m[0].length;
       }
       if (last < src.length) {
-        out += highlightText(src.slice(last), rawQuery);
+        out += highlightText(src.slice(last), query);
       }
       return out;
     }
@@ -663,7 +674,7 @@
 
     function escapeChip(s) {
       s = escapeHtml(s).replace(/(\d+)$/, '($1)')
-      s = s.replace(/\((.*?)\)/, '<sub>$1</sub>')
+      s = s.replace(/[\(（](.*?)[\)）]/, '<sub>$1</sub>')
       return s;
     }
 

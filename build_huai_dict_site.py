@@ -20,23 +20,26 @@ def render_template(template_path: Path, replacements: dict[str, str]) -> str:
     return tpl
 
 def strip_reference_prefix(line: str) -> str:
-  s = (line or "").strip()
-  s = re.sub(r"^\s*#+\s*", "", s)
-  s = re.sub(r"^\s*[-*+]\s*", "", s)
-  s = re.sub(r"^\s*\d+[.)、]\s*", "", s)
-  s = re.sub(r"^\s*(?:参考资料|书目|资料来源)\s*[:：]\s*", "", s)
-  return s.strip()
+    s = (line or "").strip()
+    s = re.sub(r"^\s*#+\s*", "", s)
+    s = re.sub(r"^\s*[-*+]\s*", "", s)
+    s = re.sub(r"^\s*\d+[.)、]\s*", "", s)
+    s = re.sub(r"^\s*(?:参考资料|书目|资料来源)\s*[:：]\s*", "", s)
+    return s.strip()
+
+def norm_line(line):
+    return line.replace(r"\\u3000", " ").replace("（", "(").replace("）", ")").replace("～", "~").replace("：", ":").replace("；", ";").replace("，", ",").replace("！", "!").replace("？", "?").strip()
+
 
 def clean_line(line: str) -> str:
-    line = line.replace(r"\\u3000", " ")
-    line = line.replace("（", "(").replace("）", ")")
+    line = norm_line(line)
     if line.startswith("- ") or line.startswith("1. "):
         line = line[2:].strip()
         if "【" not in line: line = f"【{line}】"
     return line.strip()
 
 
-def parse_entry(line: str, dialect: str):
+def parse_md(line: str, dialect: str):
     line = clean_line(line)
     if not line:
         return None
@@ -53,7 +56,7 @@ def parse_entry(line: str, dialect: str):
     rest = line[m.end():].strip()
     pinyins = [p.strip() for p in PINYIN_RE.findall(rest) if p.strip()]
 
-    # 释义里去掉反引号拼音片段，保留其他信息
+    # 释义里去掉拼音片段，保留其他信息
     explanation = PINYIN_RE.sub("", rest)
     explanation = re.sub(r"\s+", " ", explanation).strip(" -:\u3000")
 
@@ -64,13 +67,29 @@ def parse_entry(line: str, dialect: str):
         "explanation": explanation,
     }
 
+def parse_tsv(line: str, dialect: str):
+    line = norm_line(line)
+    count = line.count("\t")
+    if count == 0: return None
+    if count == 1:
+        heads, pinyins = line.split("\t")
+        explanation = ""
+    else:
+        heads, pinyins, explanation = line.split("\t")[:3]
+    return {
+        "dialect": dialect,
+        "heads": [heads],
+        "pinyin": [pinyins],
+        "explanation": explanation,
+    }
 
 def load_entries():
     dialects = []
     entries = []
     references = {}
     uniq = set()
-    for md_path in sorted(ROOT.glob("*.md")):
+    for md_path in sorted(ROOT.glob("[0-9]*.*")):
+        is_tsv = md_path.suffix == ".tsv"
         dialect = md_path.stem.lstrip("0123456789")
         dialects.append(dialect)
         text = md_path.read_text(encoding="utf-8", errors="ignore")
@@ -91,7 +110,10 @@ def load_entries():
             for group in groups:
                 if inline_groups and not HEAD_RE.match(group):
                     group = f"【{group}】"
-                entry = parse_entry(group, dialect)
+                if is_tsv:
+                    entry = parse_tsv(group, dialect)
+                else:
+                    entry = parse_md(group, dialect)
                 if entry and (entry["explanation"] or len(entry["heads"][0]) != 1):
                     if str(entry) not in uniq:
                         entries.append(entry)
