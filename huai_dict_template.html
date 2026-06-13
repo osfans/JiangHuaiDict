@@ -66,6 +66,7 @@
     }
     .ref-book { color: #30476f; }
     .ref-author { color: var(--muted); margin-left: 4px; }
+    .ref-count { color: var(--muted); margin-right: 6px; font-size: 13px; }
     .panel {
       background: var(--card);
       border: 1px solid var(--line);
@@ -119,6 +120,7 @@
     }
     .heads { font-size: 18px; color: #1e3a8a; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
     .heads-pinyin { font-size: 12px; color: var(--muted); }
+    .head-pair { display: inline-flex; align-items: baseline; gap: 4px; }
     .exp { font-size: 15px; color: var(--ink); margin-bottom: 0; line-height: 1.75; white-space: pre-wrap; }
     .chip {
       display: inline-block;
@@ -158,7 +160,13 @@
       text-decoration-thickness: 1px;
       text-underline-offset: 3px;
     }
-    .head-mark-emphasis {
+    .head-mark-other {
+      text-emphasis: "+";
+      text-emphasis-position: under;
+      -webkit-text-emphasis: "+";
+      -webkit-text-emphasis-position: under;
+    }
+    .head-mark-special {
       text-emphasis: triangle;
       text-emphasis-position: under;
       -webkit-text-emphasis: triangle;
@@ -197,7 +205,7 @@
 <body>
   <div class="wrap">
     <h1>淮语词典</h1>
-    <div class="sub">共<span id="allCount">__TOTAL__</span>个词，<span id="updatedAt">__UPDATED_AT__</span>更新</div>
+    <div class="sub">共<span id="allCount">__TOTAL__</span>条词，<span id="updatedAt">__UPDATED_AT__</span>更新</div>
 
     <details class="ref-panel">
       <summary class="ref-title">参考资料</summary>
@@ -229,7 +237,7 @@
     }
 
     function stripHeadMarkers(s) {
-      return String(s || '').replace(/[-=?+]/g, '');
+      return String(s || '').replace(/[-=?+!]/g, '');
     }
 
     const DATA = RAW.map(r => {
@@ -320,7 +328,7 @@
       // entry.pinyin 可能为空
       if (!entry.pinyin || !entry.pinyin.length) return false;
       // 支持 ['zz1 zo5'] 这种情况，先按空格拆分所有拼音片段
-      const pinyinSegs = entry.pinyin.flatMap(p => p.split(/\s+/).filter(Boolean));
+      const pinyinSegs = entry.pinyin.flatMap(p => formatPinyin(p).split(/\s+/).filter(Boolean));
       if (segs.length > pinyinSegs.length) return false;
       for (let i = 0; i < segs.length; i++) {
         if (!pinyinSegs[i] || !pinyinSegs[i].toLowerCase().startsWith(segs[i].toLowerCase())) {
@@ -414,11 +422,19 @@
         .replace(/\?/g, '？');
     }
 
+    function formatPinyin(text) {
+      return String(text || '')
+        .replace(/(\d)([a-z])/ig, '$1 $2')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
     function markerToClass(marker) {
       if (marker === '-') return 'head-mark-single';
       if (marker === '=') return 'head-mark-double';
       if (marker === '?') return 'head-mark-wave';
-      if (marker === '+') return 'head-mark-emphasis';
+      if (marker === '+') return 'head-mark-other';
+      if (marker === '!') return 'head-mark-special';
       return '';
     }
 
@@ -441,7 +457,7 @@
 
       for (let i = 0; i < text.length; i += 1) {
         const ch = text[i];
-        if ((ch === '-' || ch === '=' || ch === '?' || ch === '+') && tokens.length) {
+        if ((ch === '-' || ch === '=' || ch === '?' || ch === '+' || ch === '!') && tokens.length) {
           tokens[tokens.length - 1].mark = ch;
           continue;
         }
@@ -538,23 +554,42 @@
       return toFullWidth((heads || []).map(h => renderHeadWord(h, rawQuery)).join('、'));
     }
 
+    function renderHeadPairs(heads, pinyins, rawQuery) {
+      const hs = Array.isArray(heads) ? heads : [];
+      const ps = Array.isArray(pinyins) ? pinyins : [];
+      if (!hs.length) return '';
+
+      // 旧数据里可能是“多个词头共用一个读音”，保留原显示。
+      if (ps.length <= 1 || ps.length !== hs.length) {
+        const headHtml = renderHeads(hs, rawQuery);
+        const normalizedPinyin = ps.map(formatPinyin).filter(Boolean);
+        const pinyinHtml = ps.length
+          ? `<span class="heads-pinyin">${highlightText(normalizedPinyin.join('; '), rawQuery)}</span>`
+          : '';
+        return `<span>${headHtml}</span>${pinyinHtml}`;
+      }
+
+      return hs.map((h, i) => {
+        const headHtml = renderHeadWord(h, rawQuery);
+        const pyHtml = `<span class="heads-pinyin">${highlightText(formatPinyin(ps[i] || ''), rawQuery)}</span>`;
+        return `<span class="head-pair"><span>${headHtml}</span>${pyHtml}</span>`;
+      }).join('');
+    }
+
     function renderChunk(items, append = false) {
       if (!append) {
         listEl.innerHTML = '';
       }
       const fragments = items.map(item => {
-        const heads = `<span>${renderHeads(item.heads, currentQuery)}</span>`;
+        const heads = renderHeadPairs(item.heads, item.pinyin, currentQuery);
         const dialect = renderDynamicChip(item.dialect);
-        const pinyin = (item.pinyin && item.pinyin.length)
-          ? `<span class="heads-pinyin">${highlightText(item.pinyin.join('; '), currentQuery)}</span>`
-          : '';
         const exp = !!(item.explanation && item.explanation.trim())
           ? `<div class="exp">${renderExplanation(item.explanation, currentQuery)}</div>`
           : '';
         const watermark = item.book ? `<div class="watermark">${escapeHtml(item.book)}</div>` : '';
         return `
           <article class="item">
-            <div class="heads">${heads}${pinyin}${dialect}</div>
+            <div class="heads">${heads}${dialect}</div>
             ${exp}
             ${watermark}
           </article>
@@ -614,10 +649,12 @@
       const rows = refEntries.map(([dialect, meta]) => {
         const book = escapeHtml(String((meta && meta.book) || ''));
         const author = String((meta && meta.author) || '');
+        const count = Number((meta && meta.count) || 0);
         const authorHtml = author
-          ? `<span class="ref-author">（${renderExplanation(author, '')}）</span>`
+          ? `<span class="ref-author">（${renderExplanation(author, '').replaceAll('<br>', ' ')}）</span>`
           : '';
-        return `<li>${renderDynamicChip(dialect)}<span class="ref-sep"> </span><span class="ref-book">${book}</span>${authorHtml}</li>`;
+        const countHtml = `<span class="ref-count">${count}条词</span>`;
+        return `<li>${renderDynamicChip(dialect)}<span class="ref-sep"> </span>${countHtml}<span class="ref-book">${book}</span>${authorHtml}</li>`;
       });
       refListEl.innerHTML = rows.join('');
     }
@@ -712,7 +749,7 @@
     }
 
     function escapeChip(s) {
-      s = escapeHtml(s).replace(/(\d+)$/, '($1)')
+      s = escapeHtml(s).replace(/\d+$/, '')
       s = s.replace(/[\(（](.*?)[\)）]/, '<sub>$1</sub>')
       return s;
     }

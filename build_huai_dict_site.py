@@ -12,7 +12,7 @@ TEMPLATE = ROOT / "huai_dict_template.html"
 
 HEAD_RE = re.compile(r"^(?:【[^】]+】)+")
 WORD_RE = re.compile(r"【([^】]+)】")
-PINYIN_RE = re.compile(r"^([a-z][a-z0-9 ,;/\-]*)")
+PINYIN_RE = re.compile(r"^([a-z\[][a-z0-9 ,;/\-\[\]]*)")
 
 
 def render_template(template_path: Path, replacements: dict[str, str]) -> str:
@@ -48,20 +48,40 @@ def parse_md(line: str, dialect: str):
     if not line:
         return None
 
-    m = HEAD_RE.match(line)
-    if not m:
-        return None
+    cursor = 0
+    heads = []
+    pinyins = []
 
-    head_block = m.group(0)
-    heads = [w.strip().strip("。") for w in WORD_RE.findall(head_block) if w.strip()]
+    # 兼容“【词】拼音【词】拼音释义”这类连续多段格式。
+    while cursor < len(line):
+        m_head = HEAD_RE.match(line[cursor:])
+        if not m_head:
+            break
+
+        head_block = m_head.group(0)
+        heads.extend([w.strip().strip("。") for w in WORD_RE.findall(head_block) if w.strip()])
+        cursor += m_head.end()
+
+        while cursor < len(line) and line[cursor].isspace():
+            cursor += 1
+
+        m_py = PINYIN_RE.match(line[cursor:])
+        if m_py and m_py.group(1).strip():
+            p = re.sub("(\\d) ([a-z])", "\\1\\2", m_py.group(1).strip())
+            pinyins.append(p)
+            cursor += m_py.end()
+
+        while cursor < len(line) and line[cursor].isspace():
+            cursor += 1
+
+        if cursor >= len(line) or line[cursor] != "【":
+            break
+
     if not heads:
         return None
 
-    rest = line[m.end():].strip()
-    pinyins = [p.strip() for p in PINYIN_RE.findall(rest) if p.strip()]
-
-    # 释义里去掉拼音片段，保留其他信息
-    explanation = PINYIN_RE.sub("", rest)
+    rest = line[cursor:].strip()
+    explanation = rest
     explanation = re.sub(r"\s+", " ", explanation).strip(" -:\u3000")
     explanation = re.sub(r"^([名动形代副量叹连介助语拟])[容气声]?词[ ,]?", "〈\\1〉", explanation)
 
@@ -92,6 +112,7 @@ def load_entries():
     seen_dialects = set()
     entries = []
     references = {}
+    dialect_entry_counts = {}
     uniq = set()
 
     def add_dialect(name: str):
@@ -100,6 +121,7 @@ def load_entries():
             return
         seen_dialects.add(n)
         dialects.append(n)
+        dialect_entry_counts.setdefault(n, 0)
 
     for md_path in sorted(ROOT.glob("[0-9]*.*")):
         is_tsv = md_path.suffix == ".tsv"
@@ -133,7 +155,14 @@ def load_entries():
                 if entry and (entry["explanation"] or len(entry["heads"][0]) != 1):
                     if str(entry) not in uniq:
                         entries.append(entry)
+                        dialect_entry_counts[dialect] = dialect_entry_counts.get(dialect, 0) + 1
                     uniq.add(str(entry))
+
+    for dialect in dialects:
+        count = dialect_entry_counts.get(dialect, 0)
+        if dialect in references or count > 0:
+            meta = references.setdefault(dialect, {})
+            meta["count"] = count
     return dialects, entries, references
 
 
