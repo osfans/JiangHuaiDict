@@ -85,7 +85,7 @@
       padding: 14px;
       box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
     }
-    .controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, 32vw); gap: 10px; align-items: center; }
+    .controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(70px, 20vw); gap: 10px; align-items: center; }
     .search-wrap {
       position: relative;
       min-width: 0;
@@ -97,6 +97,7 @@
       background: #fff;
       color: var(--ink);
       font-size: 15px;
+      font-family: inherit;
       padding: 0 12px;
     }
     #q {
@@ -358,8 +359,8 @@
     function stableHash(text) {
       const src = String(text || '');
       let h = 2166136261;
-      for (let i = 0; i < src.length; i += 1) {
-        h ^= src.charCodeAt(i);
+      for (const char of src) {
+        h ^= (char.codePointAt(0) || 0);
         h = Math.imul(h, 16777619);
       }
       return h >>> 0;
@@ -535,9 +536,32 @@
       const tokens = [];
       const leadingAnnotations = [];
       const text = String(word || '');
+      let inAnnotation = false;
+      let annotationContent = '';
 
-      for (let i = 0; i < text.length; i += 1) {
-        const ch = text[i];
+      function pushAnnotation(content) {
+        const normalized = String(content || '').trim();
+        if (!normalized) return;
+        const annotation = splitHeadAnnotation(normalized);
+        if (tokens.length) {
+          tokens[tokens.length - 1].annotations.push(annotation);
+        } else {
+          leadingAnnotations.push(annotation);
+        }
+      }
+
+      for (const ch of text) {
+        if (inAnnotation) {
+          if (ch === ')') {
+            pushAnnotation(annotationContent);
+            annotationContent = '';
+            inAnnotation = false;
+          } else {
+            annotationContent += ch;
+          }
+          continue;
+        }
+
         if ((ch === '-' || ch === '=' || ch === '?' || ch === '+' || ch === '!') && tokens.length) {
           tokens[tokens.length - 1].mark = ch;
           continue;
@@ -547,21 +571,15 @@
           continue;
         }
         if (ch === '(') {
-          let end = i + 1;
-          while (end < text.length && text[end] !== ')') end += 1;
-          const content = text.slice(i + 1, end < text.length ? end : text.length).trim();
-          if (content) {
-            const annotation = splitHeadAnnotation(content);
-            if (tokens.length) {
-              tokens[tokens.length - 1].annotations.push(annotation);
-            } else {
-              leadingAnnotations.push(annotation);
-            }
-          }
-          i = end < text.length ? end : text.length;
+          inAnnotation = true;
+          annotationContent = '';
           continue;
         }
         tokens.push({ ch, mark: '', annotations: [], coartWithNext: false });
+      }
+
+      if (inAnnotation) {
+        pushAnnotation(annotationContent);
       }
 
       return { tokens, leadingAnnotations };
@@ -647,7 +665,7 @@
       const ranges = [];
       let m;
       while ((m = pattern.exec(src)) !== null) {
-        ranges.push([m.index, m.index + m[0].length]);
+        ranges.push([m.index, m.index + [...m[0]].length]);
       }
 
       if (!ranges.length) {
@@ -969,7 +987,7 @@
     renderReferences();
     statsEl.textContent = '正在加载...';
     listEl.innerHTML = '<div class="empty">正在加载词条...</div>';
-    setHeadOnlyEnabled(true);
+    setHeadOnlyEnabled(false);
     finishLoading();
     search();
   </script>
