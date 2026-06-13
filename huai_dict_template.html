@@ -74,7 +74,11 @@
       padding: 14px;
       box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
     }
-    .controls { display: grid; grid-template-columns: auto 1fr 220px; gap: 10px; align-items: center; }
+    .controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, 32vw); gap: 10px; align-items: center; }
+    .search-wrap {
+      position: relative;
+      min-width: 0;
+    }
     input, select {
       height: 42px;
       border-radius: 10px;
@@ -84,20 +88,38 @@
       font-size: 15px;
       padding: 0 12px;
     }
-    .check {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      color: var(--muted);
-      font-size: 14px;
-      white-space: nowrap;
-      user-select: none;
+    #q {
+      width: 100%;
+      padding-right: 78px;
     }
-    .check input {
-      width: 16px;
-      height: 16px;
-      margin: 0;
-      padding: 0;
+    .head-toggle {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      min-width: 62px;
+      height: 32px;
+      padding: 0 8px;
+      border-radius: 8px;
+      border: 1px solid #b8cdf8;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 600;
+      cursor: pointer;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .head-toggle.is-active {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
+    }
+    .head-toggle:focus-visible {
+      outline: 2px solid #93c5fd;
+      outline-offset: 1px;
     }
     .stats { margin: 12px 2px 8px; color: var(--muted); font-size: 14px; }
     .list { display: grid; gap: 10px; }
@@ -181,6 +203,11 @@
       color: var(--muted);
       margin-left: 2px;
     }
+    .head-coart-link {
+      color: var(--muted);
+      margin: 0 1px;
+      opacity: 0.9;
+    }
     sub {
       vertical-align: bottom;
       font-size: 0.75em;
@@ -198,24 +225,26 @@
       border-top: 1px solid #c0d8ee;
     }
     @media (max-width: 760px) {
-      .controls { grid-template-columns: 1fr; }
+      .controls { gap: 8px; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>淮语词典</h1>
-    <div class="sub">共<span id="allCount">__TOTAL__</span>条词，<span id="updatedAt">__UPDATED_AT__</span>更新</div>
+    <div class="sub"><span id="updatedAt">__UPDATED_AT__</span>更新</div>
 
     <details class="ref-panel">
-      <summary class="ref-title">参考资料</summary>
+      <summary class="ref-title">参考资料<span id="refTotalCount"></span></summary>
       <ul class="ref-list" id="refList"></ul>
     </details>
 
     <div class="panel">
       <div class="controls">
-        <label class="check" for="headOnly"><input id="headOnly" type="checkbox" checked />仅词头</label>
-        <input id="q" placeholder="正在加载，请稍候" disabled />
+        <div class="search-wrap">
+          <input id="q" placeholder="正在加载，请稍候" disabled />
+          <button id="headOnlyBtn" class="head-toggle is-active" type="button" aria-pressed="true">仅词头</button>
+        </div>
         <select id="dialect"></select>
 
       </div>
@@ -237,7 +266,7 @@
     }
 
     function stripHeadMarkers(s) {
-      return String(s || '').replace(/[-=?+!]/g, '');
+      return String(s || '').replace(/[-=?+!ʰ]/g, '');
     }
 
     const DATA = RAW.map(r => {
@@ -263,9 +292,18 @@
 
     const qEl = document.getElementById('q');
     const dialectEl = document.getElementById('dialect');
-    const headOnlyEl = document.getElementById('headOnly');
+    const headOnlyBtnEl = document.getElementById('headOnlyBtn');
     const listEl = document.getElementById('list');
     const statsEl = document.getElementById('stats');
+        function isHeadOnlyEnabled() {
+          return headOnlyBtnEl.getAttribute('aria-pressed') === 'true';
+        }
+
+        function setHeadOnlyEnabled(enabled) {
+          headOnlyBtnEl.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+          headOnlyBtnEl.classList.toggle('is-active', enabled);
+        }
+
     let currentMatches = [];
     let renderedCount = 0;
     let io = null;
@@ -273,7 +311,7 @@
 
     const dialects = DIALECTS.slice();
     const displayDialects = [...new Set(dialects.map(displayDialect))];
-    dialectEl.innerHTML = ['<option value="">全部方言</option>']
+    dialectEl.innerHTML = ['<option value="">不限</option>']
       .concat(displayDialects.map(d => `<option value="${d}">${d}</option>`)).join('');
 
     function displayDialect(d) {
@@ -461,6 +499,10 @@
           tokens[tokens.length - 1].mark = ch;
           continue;
         }
+        if (ch === 'ʰ' && tokens.length >= 2) {
+          tokens[tokens.length - 2].coartWithNext = true;
+          continue;
+        }
         if (ch === '(') {
           let end = i + 1;
           while (end < text.length && text[end] !== ')') end += 1;
@@ -476,7 +518,7 @@
           i = end < text.length ? end : text.length;
           continue;
         }
-        tokens.push({ ch, mark: '', annotations: [] });
+        tokens.push({ ch, mark: '', annotations: [], coartWithNext: false });
       }
 
       return { tokens, leadingAnnotations };
@@ -489,6 +531,14 @@
     }
 
     function renderHeadToken(token) {
+      const parts = getHeadTokenParts(token);
+      const head = parts.ruby
+        ? `<ruby class="head-ruby">${parts.base}<rt>${escapeHtml(parts.ruby)}</rt></ruby>`
+        : parts.base;
+      return `${head}${parts.noteHtml}`;
+    }
+
+    function getHeadTokenParts(token) {
       const cls = markerToClass(token.mark);
       let base = escapeHtml(token.ch);
       if (cls) {
@@ -506,11 +556,35 @@
         }
       }
 
-      const head = ruby
-        ? `<ruby class="head-ruby">${base}<rt>${escapeHtml(ruby)}</rt></ruby>`
-        : base;
-      const noteHtml = notes.map(note => `<sub class="head-note">${escapeHtml(note)}</sub>`).join('');
-      return `${head}${noteHtml}`;
+      return {
+        base,
+        ruby,
+        noteHtml: notes.map(note => `<sub class="head-note">${escapeHtml(note)}</sub>`).join('')
+      };
+    }
+
+    function renderCoartPair(leftToken, rightToken) {
+      const left = getHeadTokenParts(leftToken);
+      const right = getHeadTokenParts(rightToken);
+      const pairRuby = right.ruby || left.ruby;
+      const pairBase = `${left.base}<span class="head-coart-link">\u035C</span>${right.base}`;
+      const pairHead = pairRuby
+        ? `<ruby class="head-ruby">${pairBase}<rt>${escapeHtml(pairRuby)}</rt></ruby>`
+        : pairBase;
+      return `${pairHead}${left.noteHtml}${right.noteHtml}`;
+    }
+
+    function renderHeadTokens(tokens) {
+      let out = '';
+      for (let i = 0; i < tokens.length; i += 1) {
+        if (tokens[i].coartWithNext && i + 1 < tokens.length) {
+          out += renderCoartPair(tokens[i], tokens[i + 1]);
+          i += 1;
+          continue;
+        }
+        out += renderHeadToken(tokens[i]);
+      }
+      return out;
     }
 
     function renderHeadWord(word, rawQuery) {
@@ -519,7 +593,7 @@
       const prefix = leadingAnnotations.map(renderStandaloneAnnotation).join('');
       const keyword = (rawQuery || '').trim();
       if (!keyword) {
-        return prefix + tokens.map(renderHeadToken).join('');
+        return prefix + renderHeadTokens(tokens);
       }
 
       const segs = keyword.split(/\s+/).filter(Boolean);
@@ -534,18 +608,31 @@
       }
 
       if (!ranges.length) {
-        return prefix + tokens.map(renderHeadToken).join('');
+        return prefix + renderHeadTokens(tokens);
       }
 
       let out = prefix;
       let r = 0;
       for (let i = 0; i < tokens.length; i += 1) {
-        while (r < ranges.length && i >= ranges[r][1]) r += 1;
-        if (r < ranges.length && i === ranges[r][0]) out += '<mark class="hl">';
+        const isCoartPair = tokens[i].coartWithNext && i + 1 < tokens.length;
+        const pairLen = isCoartPair ? 2 : 1;
 
+        while (r < ranges.length && i >= ranges[r][1]) r += 1;
+        if (r < ranges.length && (i === ranges[r][0] || (isCoartPair && i + 1 === ranges[r][0]))) {
+          out += '<mark class="hl">';
+        }
+
+        if (isCoartPair) {
+          out += renderCoartPair(tokens[i], tokens[i + 1]);
+          if (r < ranges.length && (i + 1 === ranges[r][1] || i + 2 === ranges[r][1])) {
+            out += '</mark>';
+          }
+          i += 1;
+          continue;
+        }
         out += renderHeadToken(tokens[i]);
 
-        if (r < ranges.length && i + 1 === ranges[r][1]) out += '</mark>';
+        if (r < ranges.length && i + pairLen === ranges[r][1]) out += '</mark>';
       }
       return out;
     }
@@ -640,6 +727,8 @@
 
     function renderReferences() {
       const refListEl = document.getElementById('refList');
+      const refTotalCountEl = document.getElementById('refTotalCount');
+      refTotalCountEl.textContent = `（${DATA.length}条词）`;
       const refEntries = Object.entries(REFS || {});
       if (!refEntries.length) {
         refListEl.innerHTML = '<li>暂无参考资料</li>';
@@ -664,11 +753,7 @@
         statsEl.textContent = '什么都没找到';
         return;
       }
-      if (renderedCount < currentMatches.length) {
-        statsEl.textContent = `找到 ${currentMatches.length} 条，已显示 ${renderedCount} 条`;
-      } else {
-        statsEl.textContent = `找到 ${currentMatches.length} 条`;
-      }
+      statsEl.textContent = `找到 ${currentMatches.length} 条`;
     }
 
     function teardownObserver() {
@@ -733,7 +818,7 @@
       const qRaw = qEl.value;
       const q = norm(qRaw);
       const dialect = dialectEl.value;
-      const headOnly = !!headOnlyEl.checked;
+      const headOnly = isHeadOnlyEnabled();
       currentQuery = qRaw;
       currentMatches = INDEXED.filter(x => match(x, q, dialect, headOnly));
       renderNextChunk(true);
@@ -756,18 +841,22 @@
 
     function finishLoading() {
       qEl.disabled = false;
-      qEl.placeholder = '输入词头、拼音、释义开始搜索';
+      qEl.placeholder = '搜索词、音、义';
     }
 
     const searchDebounced = debounce(search, DEBOUNCE_MS);
     qEl.addEventListener('input', searchDebounced);
     dialectEl.addEventListener('change', search);
-    headOnlyEl.addEventListener('change', search);
+    headOnlyBtnEl.addEventListener('click', () => {
+      setHeadOnlyEnabled(!isHeadOnlyEnabled());
+      search();
+    });
 
     // Initial render loads all entries
     renderReferences();
     statsEl.textContent = '正在加载...';
     listEl.innerHTML = '<div class="empty">正在加载词条...</div>';
+    setHeadOnlyEnabled(true);
     finishLoading();
     search();
   </script>
