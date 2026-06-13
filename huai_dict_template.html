@@ -39,7 +39,6 @@
     }
     .ref-title {
       color: #1e3a8a;
-      font-weight: 700;
       margin-bottom: 8px;
       cursor: pointer;
       user-select: none;
@@ -127,10 +126,12 @@
       border: 1px solid var(--line);
       border-radius: 12px;
       padding: 12px;
+      padding-bottom: 24px;
       background: #fff;
       position: relative;
     }
     .watermark {
+      position: absolute;
       text-align: right;
       bottom: 8px;
       right: 8px;
@@ -141,9 +142,33 @@
       user-select: none;
     }
     .heads { font-size: 18px; color: #1e3a8a; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
-    .heads-pinyin { font-size: 12px; color: var(--muted); }
-    .head-pair { display: inline-flex; align-items: baseline; gap: 4px; }
+    .heads.is-toggleable {
+      cursor: pointer;
+      user-select: text;
+      -webkit-user-select: text;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .heads.is-toggleable::after {
+      content: '▾';
+      display: inline-block;
+      margin-left: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      transform: translateY(-1px);
+    }
+    .heads.is-toggleable.is-collapsed::after {
+      content: '▸';
+    }
+    .heads.is-toggleable:focus-visible {
+      outline: 2px solid #93c5fd;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    .heads-pinyin { font-size: 12px; color: var(--muted); margin-left: 3px; }
+    .head-pair { display: inline-flex; align-items: baseline; gap: 3px; }
     .exp { font-size: 15px; color: var(--ink); margin-bottom: 0; line-height: 1.75; white-space: pre-wrap; }
+    .exp.is-collapsed { display: none; }
     .chip {
       display: inline-block;
       font-size: 12px;
@@ -152,7 +177,7 @@
       color: var(--chip-text);
       border-radius: 4px;
       padding: 1px 4px;
-      margin-right: 2px;
+      margin-left: 2px;
     }
     .chip.chip-dynamic {
       background: var(--chip-bg, var(--chip));
@@ -669,14 +694,19 @@
       }
       const fragments = items.map(item => {
         const heads = renderHeadPairs(item.heads, item.pinyin, currentQuery);
+        const hasExp = !!(item.explanation && item.explanation.trim());
+        const headsClass = hasExp ? 'heads is-toggleable' : 'heads';
+        const headsAttrs = hasExp
+          ? ' role="button" tabindex="0" aria-expanded="true"'
+          : '';
         const dialect = renderDynamicChip(item.dialect);
-        const exp = !!(item.explanation && item.explanation.trim())
+        const exp = hasExp
           ? `<div class="exp">${renderExplanation(item.explanation, currentQuery)}</div>`
           : '';
         const watermark = item.book ? `<div class="watermark">${escapeHtml(item.book)}</div>` : '';
         return `
           <article class="item">
-            <div class="heads">${heads}${dialect}</div>
+            <div class="${headsClass}"${headsAttrs}><span class="heads-main">${heads}</span>${dialect}</div>
             ${exp}
             ${watermark}
           </article>
@@ -824,6 +854,28 @@
       renderNextChunk(true);
     }
 
+    function toggleEntryExplanationFromHeads(headRowEl) {
+      if (!headRowEl || !headRowEl.classList.contains('is-toggleable')) return;
+      const itemEl = headRowEl.closest('.item');
+      if (!itemEl) return;
+      const expEl = itemEl.querySelector('.exp');
+      if (!expEl) return;
+
+      const collapsed = expEl.classList.toggle('is-collapsed');
+      headRowEl.classList.toggle('is-collapsed', collapsed);
+      headRowEl.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+
+    function hasActiveSelectionInElement(el) {
+      if (!el || !window.getSelection) return false;
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
+      const range = sel.getRangeAt(0);
+      const container = range.commonAncestorContainer;
+      const node = container.nodeType === Node.TEXT_NODE ? container.parentNode : container;
+      return !!(node && el.contains(node));
+    }
+
     function escapeHtml(s) {
       return s
         .replace(/&/g, '&amp;')
@@ -844,9 +896,52 @@
       qEl.placeholder = '搜索词、音、义';
     }
 
+    function getSoleSelectedDialectChip(selection) {
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+      const range = selection.getRangeAt(0);
+      const selectedText = selection.toString().trim();
+      if (!selectedText) return null;
+
+      const chips = Array.from(document.querySelectorAll('.chip.chip-dynamic'));
+      const intersected = chips.filter(chip => {
+        try {
+          return range.intersectsNode(chip);
+        } catch (_) {
+          return false;
+        }
+      });
+      if (intersected.length !== 1) return null;
+
+      const chip = intersected[0];
+      const chipText = (chip.textContent || '').trim();
+      if (!chipText) return null;
+      if (selectedText !== chipText) return null;
+      return chip;
+    }
+
     const searchDebounced = debounce(search, DEBOUNCE_MS);
     qEl.addEventListener('input', searchDebounced);
     dialectEl.addEventListener('change', search);
+    document.addEventListener('copy', (event) => {
+      const selection = window.getSelection();
+      const chip = getSoleSelectedDialectChip(selection);
+      if (!chip || !event.clipboardData) return;
+      const label = (chip.textContent || '').trim();
+      event.preventDefault();
+      event.clipboardData.setData('text/plain', `〔${label}〕`);
+    });
+    listEl.addEventListener('click', (event) => {
+      const headRowEl = event.target.closest('.heads');
+      if (hasActiveSelectionInElement(headRowEl)) return;
+      toggleEntryExplanationFromHeads(headRowEl);
+    });
+    listEl.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const headRowEl = event.target.closest('.heads');
+      if (!headRowEl || !headRowEl.classList.contains('is-toggleable')) return;
+      event.preventDefault();
+      toggleEntryExplanationFromHeads(headRowEl);
+    });
     headOnlyBtnEl.addEventListener('click', () => {
       setHeadOnlyEnabled(!isHeadOnlyEnabled());
       search();
