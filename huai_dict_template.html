@@ -159,9 +159,12 @@
       color: var(--muted);
     }
     .head-note {
-      font-size: 12px;
       color: var(--muted);
       margin-left: 2px;
+    }
+    sub {
+      vertical-align: bottom;
+      font-size: 0.75em;
     }
     .empty {
       text-align: center;
@@ -179,10 +182,8 @@
     <div class="sub">共<span id="allCount">__TOTAL__</span>个词，<span id="updatedAt">__UPDATED_AT__</span>更新</div>
 
     <details class="ref-panel">
-      <summary class="ref-title">参考书目</summary>
-      <ul class="ref-list">
-        __REFS_HTML__
-      </ul>
+      <summary class="ref-title">参考资料</summary>
+      <ul class="ref-list" id="refList"></ul>
     </details>
 
     <div class="panel">
@@ -201,6 +202,7 @@
     const CHUNK_SIZE = 200;
     const DEBOUNCE_MS = 120;
 
+    const REFS = __REFS_JSON__;
     const DIALECTS = __DIALECTS_JSON__;
     const RAW = __DATA_JSON__;
     function normalizeHeadForSearch(s) {
@@ -421,7 +423,7 @@
     function renderStandaloneAnnotation(annotation) {
       const text = [annotation.ruby, annotation.note].filter(Boolean).join(' ');
       if (!text) return '';
-      return `<small class="head-note">${escapeHtml(text)}</small>`;
+      return `<sub class="head-note">${escapeHtml(text)}</sub>`;
     }
 
     function renderHeadToken(token) {
@@ -445,7 +447,7 @@
       const head = ruby
         ? `<ruby class="head-ruby">${base}<rt>${escapeHtml(ruby)}</rt></ruby>`
         : base;
-      const noteHtml = notes.map(note => `<small class="head-note">${escapeHtml(note)}</small>`).join('');
+      const noteHtml = notes.map(note => `<sub class="head-note">${escapeHtml(note)}</sub>`).join('');
       return `${head}${noteHtml}`;
     }
 
@@ -551,6 +553,25 @@
       return out;
     }
 
+    function renderReferences() {
+      const refListEl = document.getElementById('refList');
+      const refEntries = Object.entries(REFS || {});
+      if (!refEntries.length) {
+        refListEl.innerHTML = '<li>暂无参考资料</li>';
+        return;
+      }
+
+      const rows = refEntries.map(([dialect, meta]) => {
+        const book = escapeHtml(String((meta && meta.book) || ''));
+        const author = String((meta && meta.author) || '');
+        const authorHtml = author
+          ? `<span class="ref-author">（${renderExplanation(author, '')}）</span>`
+          : '';
+        return `<li>${renderDynamicChip(dialect)}<span class="ref-sep"> </span><span class="ref-book">${book}</span>${authorHtml}</li>`;
+      });
+      refListEl.innerHTML = rows.join('');
+    }
+
     function updateStats() {
       if (!currentMatches.length) {
         statsEl.textContent = '什么都没找到';
@@ -641,7 +662,9 @@
     }
 
     function escapeChip(s) {
-      return escapeHtml(s).replace(/(\d+)$/, '<small>$1</small>')
+      s = escapeHtml(s).replace(/(\d+)$/, '($1)')
+      s = s.replace(/\((.*?)\)/, '<sub>$1</sub>')
+      return s;
     }
 
     function finishLoading() {
@@ -655,6 +678,7 @@
     headOnlyEl.addEventListener('change', search);
 
     // Initial render loads all entries
+    renderReferences();
     statsEl.textContent = '正在加载...';
     listEl.innerHTML = '<div class="empty">正在加载词条...</div>';
     finishLoading();

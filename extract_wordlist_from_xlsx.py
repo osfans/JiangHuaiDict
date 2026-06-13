@@ -67,8 +67,7 @@ def build_wordlist() -> list[str]:
             continue
 
         parts = [f"{''.join(f'〔{p}〕' for p in places)}{exp}" for places, exp in merged_parts]
-        lines.append(f"【{head}】{''.join(parts)}")
-    lines[0] = f"共{len(lines) - 2}条"
+        lines.append(f"【{head}】{''.join(parts)}  ")
     lines[1] = f"{''.join(f'〔{place}〕{count}' for place, count in place_count.items())}"
 
     return lines
@@ -78,7 +77,7 @@ def main() -> None:
     lines = build_wordlist()
     OUTPUT_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"已生成: {OUTPUT_MD}")
-    print(f"词条数: {max(len(lines) - 1, 0)}")
+    print(f"词条数: {max(len(lines) - 2, 0)}")
 
 
 if __name__ == "__main__":
