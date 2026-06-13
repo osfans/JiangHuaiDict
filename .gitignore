@@ -1,3 +1,4 @@
-*.htm*
+index.html
 *.log
 *.xlsx
+*.woff2

@@ -39,8 +39,7 @@
         var(--bg);
     }
     .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 36px; }
-    h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.2; }
-    .sub { color: var(--muted); margin-bottom: 16px; }
+    h1, h2, h3, h4, h5, h6 { margin: 8px; }
     .ref-panel {
       background: var(--card);
       border: 1px solid var(--line);
@@ -73,11 +72,11 @@
       padding-left: 18px;
       color: var(--muted);
       line-height: 1.7;
-      font-size: 14px;
+      font-size: 12px;
     }
     .ref-book { color: #30476f; }
     .ref-author { color: var(--muted); margin-left: 4px; }
-    .ref-count { color: var(--muted); margin-right: 6px; font-size: 13px; }
+    .ref-count { color: var(--muted); margin-right: 6px; font-size: 12px; }
     .panel {
       background: var(--card);
       border: 1px solid var(--line);
@@ -133,7 +132,7 @@
       outline: 2px solid #93c5fd;
       outline-offset: 1px;
     }
-    .stats { margin: 12px 2px 8px; color: var(--muted); font-size: 14px; }
+    .stats { margin: 12px 2px 8px; color: var(--muted); font-size: 12px; }
     .list { display: grid; gap: 10px; }
     .item {
       border: 1px solid var(--line);
@@ -233,7 +232,7 @@
       -webkit-text-emphasis-position: under;
     }
     .head-ruby rt {
-      font-size: 11px;
+      font-size: 12px;
       line-height: 1;
       color: var(--muted);
     }
@@ -248,7 +247,7 @@
     }
     sub {
       vertical-align: bottom;
-      font-size: 0.75em;
+      font-size: 10px;
     }
     .empty {
       text-align: center;
@@ -258,7 +257,7 @@
     footer {
       text-align: center;
       padding: 1.5rem;
-      font-size: 0.8rem;
+      font-size: 12px;
       color: #4a6a8a;
       border-top: 1px solid #c0d8ee;
     }
@@ -269,8 +268,8 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>淮语词典</h1>
-    <div class="sub"><span id="updatedAt">__UPDATED_AT__</span>更新</div>
+    <h2>淮语词典</h2>
+    <h5>__UPDATED_AT__更新</h5>
 
     <details class="ref-panel">
       <summary class="ref-title">参考资料<span id="refTotalCount"></span></summary>
@@ -281,7 +280,7 @@
       <div class="controls">
         <div class="search-wrap">
           <input id="q" placeholder="正在加载，请稍候" disabled />
-          <button id="headOnlyBtn" class="head-toggle is-active" type="button" aria-pressed="true">仅词头</button>
+          <button id="headOnlyBtn" class="head-toggle" type="button">仅词头</button>
         </div>
         <select id="dialect"></select>
 

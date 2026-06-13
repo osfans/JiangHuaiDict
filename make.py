@@ -8,7 +8,7 @@ cc = OpenCC('t2s')
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT = ROOT / "docs" / "index.html"
-TEMPLATE = ROOT / "huai_dict_template.html"
+TEMPLATE = ROOT / "template.html"
 
 HEAD_RE = re.compile(r"^(?:【[^】]+】)+")
 WORD_RE = re.compile(r"【([^】]+)】")
