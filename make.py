@@ -143,8 +143,7 @@ def load_entries():
             raw_line = norm_line(raw_line)
             groups = re.findall(r"`([^`]+)`", raw_line)
             inline_groups = len(groups) >= 1
-            if not inline_groups:
-                groups = [raw_line]
+            if not inline_groups: groups = [raw_line]
             for group in groups:
                 if inline_groups and not HEAD_RE.match(group):
                     group = f"【{group}】"
@@ -152,7 +151,12 @@ def load_entries():
                     entry = parse_tsv(group, dialect)
                 else:
                     entry = parse_md(group, dialect)
-                if entry and (entry["explanation"] or len(entry["heads"][0]) != 1):
+                if not entry: continue
+                if entry["explanation"] == "〃":
+                    entries[-1]["heads"] += entry["heads"]
+                    entries[-1]["pinyin"] += entry["pinyin"]
+                    continue
+                if (entry["explanation"] or len(entry["heads"][0]) != 1):
                     if str(entry) not in uniq:
                         entries.append(entry)
                         dialect_entry_counts[dialect] = dialect_entry_counts.get(dialect, 0) + 1

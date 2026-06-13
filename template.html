@@ -398,6 +398,15 @@
       return /^[a-zA-Z0-9 ]+$/.test(q.trim());
     }
 
+    function matchPinyinSeq(pinyinSeg, q) {
+      if (!pinyinSeg) return false;
+      if (/\d$/.test(q)) {
+        const q2 = q.replace(/^(.*)(\d)$/, "^$1\\d*?$2\\d*?$");
+        return new RegExp(q2).test(pinyinSeg);
+      }
+      return pinyinSeg.toLowerCase().startsWith(q.toLowerCase());
+    }
+
     function matchPinyin(entry, q) {
       // q 已经 trim
       if (!q) return true;
@@ -412,7 +421,7 @@
         if (segs.length > pinyinSegs.length) continue;
         var count = 0;
         for (let i = 0; i < segs.length; i++) {
-          if (!pinyinSegs[i] || !pinyinSegs[i].toLowerCase().startsWith(segs[i].toLowerCase())) {
+          if (!matchPinyinSeq(pinyinSegs[i], segs[i])) {
             continue;
           }
           count++;
