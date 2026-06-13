@@ -63,7 +63,7 @@ def parse_md(line: str, dialect: str):
     # 释义里去掉拼音片段，保留其他信息
     explanation = PINYIN_RE.sub("", rest)
     explanation = re.sub(r"\s+", " ", explanation).strip(" -:\u3000")
-    explanation = re.sub(r"^([名动形代副量叹连介助语拟])[容气声]?词[ ,]?", "\\1\u20DE", explanation)
+    explanation = re.sub(r"^([名动形代副量叹连介助语拟])[容气声]?词[ ,]?", "〈\\1〉", explanation)
 
     return {
         "dialect": dialect,
@@ -147,7 +147,7 @@ def build_html(dialects, entries, references):
     refs_json = json.dumps(references, ensure_ascii=False, separators=(",", ":"))
     dialects_json = json.dumps(dialects, ensure_ascii=False, separators=(",", ":"))
     data_json = json.dumps(records, ensure_ascii=False, separators=(",", ":"))
-    if len(sys.argv) > 1:
+    if len(sys.argv) == 1:
         json.dump(records, open("dump.json", "w", encoding="utf-8", newline="\n"), ensure_ascii=False, indent=2)
     total = len(entries)
     tz_utc8 = timezone(timedelta(hours=8))

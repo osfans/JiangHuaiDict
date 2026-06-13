@@ -32,7 +32,7 @@ jobs:
       - name: Generate HTML
         run: |
           python -m pip install opencc
-          python build_huai_dict_site.py
+          python build_huai_dict_site.py notdump
 
       - name: Deploy to SF
         run: |

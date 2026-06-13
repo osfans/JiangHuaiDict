@@ -565,7 +565,7 @@
         // 标签和普通文字之间补空格；连续标签之间不补。
         const prevChar = m.index > 0 ? src[m.index - 1] : '';
         if (prevChar && !/\s/.test(prevChar) && prevChar !== '〕') {
-          out += ' ';
+          out += '<br>';
         }
 
         out += renderDynamicChip(m[1]);
