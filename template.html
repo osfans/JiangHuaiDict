@@ -385,8 +385,12 @@
       return `<span class="chip chip-dynamic" style="${chipStyleVars(label)}">${safeLabel}</span>`;
     }
 
-    function norm(s) {
-      return (s || '').toLowerCase().trim();
+    function normQuery(s) {
+      s = (s || '').toLowerCase().trim();
+      if (isPinyinQuery(s)) {
+        s = s.replaceAll("ou", "eu").replaceAll("ai", "ae").replaceAll("ao", "o").replaceAll("ui", "uei").replaceAll("ing", "ien").replace(/([aoe]n)g/g, "$1").replace(/(iu)([^nh])/g, "ieu$2").replace(/(iu)$/g, "ieu");
+      }
+      return s;
     }
 
     function isPinyinQuery(q) {
@@ -506,6 +510,9 @@
       return String(text || '')
         .replace(/(\d)([a-z])/ig, '$1 $2')
         .replace(/\s+/g, ' ')
+        .replaceAll("ui", "uei")
+        .replace(/(i)(u[\d\s])/g, '$1e$2')
+        .replace(/(i)(u)$/g, '$1e$2')
         .trim();
     }
 
@@ -880,10 +887,10 @@
 
     function search() {
       const qRaw = qEl.value;
-      const q = norm(qRaw);
+      const q = normQuery(qRaw);
       const dialect = dialectEl.value;
       const headOnly = isHeadOnlyEnabled();
-      currentQuery = qRaw;
+      currentQuery = q;
       currentMatches = INDEXED.filter(x => match(x, q, dialect, headOnly));
       renderNextChunk(true);
     }
