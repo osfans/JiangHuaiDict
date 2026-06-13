@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>淮语词典</title>
   <style>
+    @font-face {
+      font-family: 'P1';
+      src: url('p1.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'P2';
+      src: url('p2.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+    }
     :root {
       --bg: #eef4ff;
       --card: #fafdff;
@@ -19,7 +31,7 @@
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-family: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", "P1", "P2", sans-serif;
       color: var(--ink);
       background:
         radial-gradient(circle at 10% 0%, #dbeafe 0%, transparent 36%),

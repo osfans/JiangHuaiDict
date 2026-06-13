@@ -32,11 +32,13 @@ jobs:
       - name: Generate HTML
         run: |
           python -m pip install opencc
-          python build_huai_dict_site.py notdump
+          python make.py notdump
 
       - name: Deploy to SF
         run: |
-          sshpass -p '${{ secrets.SF_PASSWORD }}' scp -o StrictHostKeyChecking=no dist/index.html ${{ secrets.SF_USERNAME }}@web.sourceforge.net:/home/project-web/jianghuaidict/htdocs
+          wget -c https://dialectfonts.sourceforge.io/p1.woff2 -P docs
+          wget -c https://dialectfonts.sourceforge.io/p2.woff2 -P docs
+          sshpass -p '${{ secrets.SF_PASSWORD }}' scp -o StrictHostKeyChecking=no docs/index.html docs/*.woff2 ${{ secrets.SF_USERNAME }}@web.sourceforge.net:/home/project-web/jianghuaidict/htdocs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -44,7 +46,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: docs
 
   deploy:
     needs: build

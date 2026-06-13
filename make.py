@@ -7,7 +7,7 @@ from opencc import OpenCC
 cc = OpenCC('t2s')
 
 ROOT = Path(__file__).resolve().parent
-OUTPUT = ROOT / "dist" / "index.html"
+OUTPUT = ROOT / "docs" / "index.html"
 TEMPLATE = ROOT / "huai_dict_template.html"
 
 HEAD_RE = re.compile(r"^(?:【[^】]+】)+")
