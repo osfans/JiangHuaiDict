@@ -179,7 +179,7 @@
     }
     .heads-pinyin { font-size: 12px; color: var(--muted); margin-left: 3px; }
     .head-pair { display: inline-flex; align-items: baseline; gap: 3px; }
-    .exp { font-size: 15px; color: var(--ink); margin-bottom: 0; line-height: 1.75; white-space: pre-wrap; }
+    .exp { font-size: 15px; color: var(--ink); margin-bottom: 0; line-height: auto; white-space: pre-wrap; }
     .exp.is-collapsed { display: none; }
     .chip {
       display: inline-block;
@@ -241,9 +241,8 @@
       margin-left: 2px;
     }
     .head-coart-link {
-      color: var(--muted);
-      margin: 0 1px;
-      opacity: 0.9;
+      line-height: 1.2;
+      vertical-align: bottom;
     }
     sub {
       vertical-align: bottom;

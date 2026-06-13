@@ -36,9 +36,7 @@ jobs:
 
       - name: Deploy to SF
         run: |
-          wget -c https://dialectfonts.sourceforge.io/p1.woff2 -P docs
-          wget -c https://dialectfonts.sourceforge.io/p2.woff2 -P docs
-          sshpass -p '${{ secrets.SF_PASSWORD }}' scp -o StrictHostKeyChecking=no docs/index.html docs/*.woff2 ${{ secrets.SF_USERNAME }}@web.sourceforge.net:/home/project-web/jianghuaidict/htdocs
+          sshpass -p '${{ secrets.SF_PASSWORD }}' scp -o StrictHostKeyChecking=no docs/index.html ${{ secrets.SF_USERNAME }}@web.sourceforge.net:/home/project-web/jianghuaidict/htdocs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
