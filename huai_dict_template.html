@@ -105,6 +105,17 @@
       border-radius: 12px;
       padding: 12px;
       background: #fff;
+      position: relative;
+    }
+    .watermark {
+      text-align: right;
+      bottom: 8px;
+      right: 8px;
+      font-size: 10px;
+      color: #b0c4de;
+      opacity: 0.6;
+      pointer-events: none;
+      user-select: none;
     }
     .heads { font-size: 18px; color: #1e3a8a; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
     .heads-pinyin { font-size: 12px; color: var(--muted); }
@@ -221,12 +232,17 @@
       return String(s || '').replace(/[-=?+]/g, '');
     }
 
-    const DATA = RAW.map(r => ({
-      dialect: DIALECTS[r[0]],
-      heads: r[1] || [],
-      pinyin: r[2] || [],
-      explanation: r[3] || ''
-    }));
+    const DATA = RAW.map(r => {
+      const dialect = DIALECTS[r[0]];
+      const meta = REFS[dialect] || {};
+      return {
+        dialect: dialect,
+        heads: r[1] || [],
+        pinyin: r[2] || [],
+        explanation: r[3] || '',
+        book: meta.book || ''
+      };
+    });
     const INDEXED = DATA.map(item => ({
       ...item,
       headText: item.heads.map(normalizeHeadForSearch).join(' ').toLowerCase(),
@@ -535,10 +551,12 @@
         const exp = !!(item.explanation && item.explanation.trim())
           ? `<div class="exp">${renderExplanation(item.explanation, currentQuery)}</div>`
           : '';
+        const watermark = item.book ? `<div class="watermark">${escapeHtml(item.book)}</div>` : '';
         return `
           <article class="item">
             <div class="heads">${heads}${pinyin}${dialect}</div>
             ${exp}
+            ${watermark}
           </article>
         `;
       });
