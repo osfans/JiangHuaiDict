@@ -438,16 +438,24 @@
       // 支持 ['zz1 zo5'] 这种情况，先按空格拆分所有拼音片段
       var ret = false;
       for (let j = 0; j < entry.pinyin.length; j++) {
-        const pinyinSegs = formatPinyin(entry.pinyin[j]).split(/[\s\[\]]+/).filter(Boolean);
-        if (segs.length > pinyinSegs.length) continue;
-        var count = 0;
-        for (let i = 0; i < segs.length; i++) {
-          if (!matchPinyinSeq(pinyinSegs[i], segs[i])) {
-            continue;
-          }
-          count++;
+        const list = [];
+        const py = formatPinyin(entry.pinyin[j]);
+        list.push(py.replace(/\/[a-z]+\d+?/g, " "));
+        if (py.includes("/")) {
+          list.push(py.replace(/[a-z]+\d+?\//g, " "));
         }
-        if (count == segs.length) return true;
+        for (let k = 0; k < list.length; k++) {
+          const pinyinSegs = list[k].split(/\s+/).filter(Boolean);
+          if (segs.length > pinyinSegs.length) continue;
+          var count = 0;
+          for (let i = 0; i < segs.length; i++) {
+            if (!matchPinyinSeq(pinyinSegs[i], segs[i])) {
+              break;
+            }
+            count++;
+          }
+          if (count == segs.length) return true;
+        }
       }
       return ret;
     }
@@ -484,33 +492,12 @@
       const keyword = (rawQuery || '').trim();
       if (!keyword) return escapeHtml(src);
 
-      // 多分段高亮，如 zz zo
-      const segs = keyword.split(/\s+/).filter(Boolean);
-      if (segs.length <= 1) {
-        const pattern = new RegExp(escapeRegExp(keyword), 'ig');
-        let result = '';
-        let last = 0;
-        let matched = false;
-        let m;
-        while ((m = pattern.exec(src)) !== null) {
-          matched = true;
-          const start = m.index;
-          const end = start + m[0].length;
-          result += escapeHtml(src.slice(last, start));
-          result += `<mark class="hl">${escapeHtml(src.slice(start, end))}</mark>`;
-          last = end;
-        }
-        if (!matched) return escapeHtml(src);
-        result += escapeHtml(src.slice(last));
-        return result;
-      }
-      // 多分段高亮
+      // 构造所有分段的正则，按长度从长到短排序，如 z zo
+      const segs = keyword.split(/\s+/).filter(Boolean).sort((a, b) => b.length - a.length);
+      const pattern = new RegExp(segs.map(escapeRegExp).join('|'), 'ig');
       let result = '';
       let last = 0;
       let matched = false;
-      // 构造所有分段的正则，按长度从长到短排序
-      const sortedSegs = segs.sort((a, b) => b.length - a.length);
-      const pattern = new RegExp(sortedSegs.map(escapeRegExp).join('|'), 'ig');
       let m;
       while ((m = pattern.exec(src)) !== null) {
         matched = true;
@@ -528,12 +515,12 @@
 
     function toFullWidth(text) {
       return String(text || '')
-        .replace(/~/g, '～')
-        .replace(/:/g, '：')
-        .replace(/;/g, '；')
-        .replace(/,/g, '，')
-        .replace(/!/g, '！')
-        .replace(/\?/g, '？');
+        .replaceAll('~', '～')
+        .replaceAll(':', '：')
+        .replaceAll(';', '；')
+        .replaceAll(',', '，')
+        .replaceAll('!', '！')
+        .replaceAll('?', '？');
     }
 
     function formatPinyin(text) {
@@ -543,6 +530,7 @@
         .replaceAll("ui", "uei")
         .replace(/(i)(u[\d\s])/g, '$1e$2')
         .replace(/(i)(u)$/g, '$1e$2')
+        .replace(/([a-z]+)(\d+)\/(\d+)/ig, '$1$2/$1$3')
         .trim();
     }
 
@@ -967,39 +955,13 @@
       qEl.placeholder = '搜索词、音、义';
     }
 
-    function getSoleSelectedDialectChip(selection) {
-      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
-      const range = selection.getRangeAt(0);
-      const selectedText = selection.toString().trim();
-      if (!selectedText) return null;
-
-      const chips = Array.from(document.querySelectorAll('.chip.chip-dynamic'));
-      const intersected = chips.filter(chip => {
-        try {
-          return range.intersectsNode(chip);
-        } catch (_) {
-          return false;
-        }
-      });
-      if (intersected.length !== 1) return null;
-
-      const chip = intersected[0];
-      const chipText = (chip.textContent || '').trim();
-      if (!chipText) return null;
-      if (selectedText !== chipText) return null;
-      return chip;
-    }
-
     const searchDebounced = debounce(search, DEBOUNCE_MS);
     qEl.addEventListener('input', searchDebounced);
     dialectEl.addEventListener('change', search);
     document.addEventListener('copy', (event) => {
       const selection = window.getSelection();
-      const chip = getSoleSelectedDialectChip(selection);
-      if (!chip || !event.clipboardData) return;
-      const label = (chip.textContent || '').trim();
       event.preventDefault();
-      event.clipboardData.setData('text/plain', `〔${label}〕`);
+      event.clipboardData.setData('text/plain', `${selection}`);
     });
     listEl.addEventListener('click', (event) => {
       const headRowEl = event.target.closest('.heads');
@@ -1020,8 +982,6 @@
 
     // Initial render loads all entries
     renderReferences();
-    statsEl.textContent = '正在加载...';
-    listEl.innerHTML = '<div class="empty">正在加载词条...</div>';
     setHeadOnlyEnabled(false);
     finishLoading();
     search();
