@@ -4,6 +4,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 from collections import defaultdict
 from opencc import OpenCC
+import re
 cc = OpenCC("t2s")
 
 
@@ -15,8 +16,10 @@ OUTPUT_MD = ROOT / "000词表.md"
 def as_text(value) -> str:
     if value is None:
         return ""
-    return cc.convert(str(value).strip())
-
+    line = str(value).strip()
+    line = re.sub("(?<=[中房明民其])閒", "間", line)
+    line = re.sub("^閒$", "間", line)
+    return cc.convert(line)
 
 def build_wordlist() -> list[str]:
     wb = load_workbook(SOURCE_XLSX, data_only=True)
