@@ -66,7 +66,7 @@ def parse_md(line: str, dialect: str):
             cursor += 1
 
         m_py = PINYIN_RE.match(line[cursor:])
-        if m_py and m_py.group(1).strip():
+        if m_py and m_py.group(1).strip() and not m_py.group(1).startswith("["):
             p = re.sub("(\\d) ([a-z])", "\\1\\2", m_py.group(1).strip())
             pinyins.append(p)
             cursor += m_py.end()
