@@ -303,16 +303,36 @@
     }
 
     function stripHeadMarkers(s) {
-      return String(s || '').replace(/[-=?+!ʰ]/g, '');
+      return String(s || '').replace(/[-=?+!&]/g, '');
     }
 
     const DATA = RAW.map(r => {
       const dialect = DIALECTS[r[0]];
       const meta = REFS[dialect] || {};
+      const heads = r[1];
+      const heads2 = [];
+      heads.forEach(element => {
+        if (element.includes("[")) {
+          heads2.push(element.replace(/\[(.*?)\]/g, ""));
+          heads2.push(element.replace(/\[(.*?)\]/g, "$1"));
+        } else {
+          heads2.push(element);
+        }
+      });
+      const pinyins = r[2];
+      const pinyins2 = [];
+      pinyins.forEach(element => {
+        if (element.includes("[")) {
+          pinyins2.push(element.replace(/\[(.*?)\]/g, " "));
+          pinyins2.push(element.replace(/\[(.*?)\]/g, " $1 "));
+        } else {
+          pinyins2.push(element);
+        }
+      });
       return {
         dialect: dialect,
-        heads: r[1] || [],
-        pinyin: r[2] || [],
+        heads: heads2,
+        pinyin: pinyins2,
         explanation: r[3] || '',
         book: meta.book || ''
       };
@@ -581,7 +601,7 @@
           tokens[tokens.length - 1].mark = ch;
           continue;
         }
-        if (ch === 'ʰ' && tokens.length >= 2) {
+        if (ch === '&' && tokens.length >= 2) {
           tokens[tokens.length - 2].coartWithNext = true;
           continue;
         }
