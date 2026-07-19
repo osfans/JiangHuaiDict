@@ -339,6 +339,8 @@
     });
     const INDEXED = DATA.map(item => ({
       ...item,
+      headLen: getEntryHeadLength(item),
+      pinyinSortKey: getEntryPinyinSortKey(item),
       headText: item.heads.map(normalizeHeadForSearch).join(' ').toLowerCase(),
       fullText: [
         item.heads.map(normalizeHeadForSearch).join(' '),
@@ -346,6 +348,63 @@
         item.explanation || ''
       ].join(' ').toLowerCase()
     }));
+
+    function getEntryHeadLength(entry) {
+      const heads = Array.isArray(entry.heads) ? entry.heads : [];
+      if (!heads.length) return Number.MAX_SAFE_INTEGER;
+      let minLen = Number.MAX_SAFE_INTEGER;
+      for (const head of heads) {
+        const normalized = normalizeHeadForSearch(head).replace(/\s+/g, '');
+        if (!normalized) continue;
+        if (normalized.length < minLen) minLen = normalized.length;
+      }
+      return minLen;
+    }
+
+    function getEntryPinyinSortKey(entry) {
+      const pinyin = (entry.pinyin || []).map(formatPinyin).filter(Boolean).join(' ');
+      return pinyin.toLowerCase();
+    }
+
+    function getHeadOnlyQueryPosition(entry, q) {
+      const keyword = String(q || '').trim();
+      if (!keyword) return Number.MAX_SAFE_INTEGER;
+      const pool = String(entry.headText || '');
+      const segs = keyword.split(/\s+/).filter(Boolean);
+      if (!segs.length) return Number.MAX_SAFE_INTEGER;
+
+      let pos = Number.MAX_SAFE_INTEGER;
+      for (const seg of segs) {
+        const index = pool.indexOf(seg);
+        if (index >= 0 && index < pos) {
+          pos = index;
+        }
+      }
+      return pos;
+    }
+
+    function compareByLengthAndPinyin(a, b) {
+      if (a.headLen !== b.headLen) return a.headLen - b.headLen;
+      if (a.pinyinSortKey < b.pinyinSortKey) return -1;
+      if (a.pinyinSortKey > b.pinyinSortKey) return 1;
+      if (a.headText < b.headText) return -1;
+      if (a.headText > b.headText) return 1;
+      return 0;
+    }
+
+    function compareForSearch(a, b, q, headOnly) {
+      if (headOnly && q) {
+        const posA = getHeadOnlyQueryPosition(a, q);
+        const posB = getHeadOnlyQueryPosition(b, q);
+        if (posA !== posB) return posA - posB;
+      }
+      if (!headOnly && q && isPinyinQuery(q)) {
+        const posA = getPinyinMatchPosition(a, q);
+        const posB = getPinyinMatchPosition(b, q);
+        if (posA !== posB) return posA - posB;
+      }
+      return compareByLengthAndPinyin(a, b);
+    }
 
     const qEl = document.getElementById('q');
     const dialectEl = document.getElementById('dialect');
@@ -428,36 +487,45 @@
       return pinyinSeg.toLowerCase().startsWith(q.toLowerCase());
     }
 
-    function matchPinyin(entry, q) {
-      // q 已经 trim
-      if (!q) return true;
+    function getPinyinMatchPosition(entry, q) {
+      if (!q) return 0;
       const segs = q.split(/\s+/).filter(Boolean);
-      if (!segs.length) return true;
-      // entry.pinyin 可能为空
-      if (!entry.pinyin || !entry.pinyin.length) return false;
-      // 支持 ['zz1 zo5'] 这种情况，先按空格拆分所有拼音片段
-      var ret = false;
+      if (!segs.length) return 0;
+      if (!entry.pinyin || !entry.pinyin.length) return Number.MAX_SAFE_INTEGER;
+
+      let best = Number.MAX_SAFE_INTEGER;
       for (let j = 0; j < entry.pinyin.length; j++) {
-        const list = [];
         const py = formatPinyin(entry.pinyin[j]);
+        const list = [];
         list.push(py.replace(/\/[a-z]+\d+?/g, " "));
         if (py.includes("/")) {
           list.push(py.replace(/[a-z]+\d+?\//g, " "));
         }
+
         for (let k = 0; k < list.length; k++) {
           const pinyinSegs = list[k].split(/\s+/).filter(Boolean);
           if (segs.length > pinyinSegs.length) continue;
-          var count = 0;
-          for (let i = 0; i < segs.length; i++) {
-            if (!matchPinyinSeq(pinyinSegs[i], segs[i])) {
-              break;
+
+          for (let start = 0; start <= pinyinSegs.length - segs.length; start++) {
+            let matched = true;
+            for (let i = 0; i < segs.length; i++) {
+              if (!matchPinyinSeq(pinyinSegs[start + i], segs[i])) {
+                matched = false;
+                break;
+              }
             }
-            count++;
+            if (!matched) continue;
+
+            const score = j * 100 + start;
+            if (score < best) best = score;
           }
-          if (count == segs.length) return true;
         }
       }
-      return ret;
+      return best;
+    }
+
+    function matchPinyin(entry, q) {
+      return getPinyinMatchPosition(entry, q) !== Number.MAX_SAFE_INTEGER;
     }
 
     function match(entry, q, dialect, headOnly) {
@@ -909,7 +977,10 @@
       const dialect = dialectEl.value;
       const headOnly = isHeadOnlyEnabled();
       currentQuery = q;
-      currentMatches = INDEXED.filter(x => match(x, q, dialect, headOnly));
+      currentMatches = INDEXED
+        .filter(x => match(x, q, dialect, headOnly));
+      if (q)
+        currentMatches.sort((a, b) => compareForSearch(a, b, q, headOnly));
       renderNextChunk(true);
     }
 
