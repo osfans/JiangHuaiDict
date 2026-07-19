@@ -185,13 +185,11 @@ def build_html(dialects, entries, references):
     data_json = json.dumps(records, ensure_ascii=False, separators=(",", ":"))
     if len(sys.argv) == 1:
         json.dump(records, open("dump.json", "w", encoding="utf-8", newline="\n"), ensure_ascii=False, indent=2)
-    total = len(entries)
     tz_utc8 = timezone(timedelta(hours=8))
     updated_at = datetime.now(tz_utc8).strftime("%Y年%m月%d号")
     return render_template(
         TEMPLATE,
         {
-            "__TOTAL__": str(total),
             "__UPDATED_AT__": updated_at,
             "__REFS_JSON__": refs_json,
             "__DIALECTS_JSON__": dialects_json,
@@ -206,8 +204,10 @@ def main():
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(html, encoding="utf-8", newline="\n")
     size_bytes = OUTPUT.stat().st_size
+    total = sum(len(e["heads"]) for e in entries)
     print(f"生成完成: {OUTPUT}")
     print(f"词条数: {len(entries)}")
+    print(f"总词头数: {total}")
     print(f"HTML大小: {size_bytes} bytes ({size_bytes / (1024 * 1024):.2f} MB)")
 
 if __name__ == "__main__":
