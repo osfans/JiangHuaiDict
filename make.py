@@ -82,9 +82,9 @@ def parse_md(line: str, dialect: str):
         return None
 
     rest = line[cursor:].strip()
-    explanation = rest
-    explanation = re.sub(r"\s+", " ", explanation).strip(" -:\u3000")
-    explanation = re.sub(r"^([名动形代副量叹连介助语拟])[容气声]?词[ ,]?", "〈\\1〉", explanation)
+    explanation = re.sub(r"\s+", " ", rest).strip()
+    explanation = re.sub(r"^([名动形代副量叹连介助语拟])[容气声]?词[ ,]?", "<\\1>", explanation)
+    explanation = re.sub(r"〚.*?〛", "", explanation)
 
     return {
         "dialect": dialect,
