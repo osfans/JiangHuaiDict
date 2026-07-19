@@ -77,7 +77,7 @@ def build_wordlist() -> list[str]:
 
 def main() -> None:
     lines = build_wordlist()
-    OUTPUT_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    OUTPUT_MD.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     print(f"已生成: {OUTPUT_MD}")
     print(f"词条数: {max(len(lines) - 2, 0)}")
 
