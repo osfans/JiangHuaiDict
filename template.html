@@ -232,9 +232,10 @@
       -webkit-text-emphasis-position: under;
     }
     .head-ruby rt {
-      font-size: 12px;
-      line-height: 1;
       color: var(--muted);
+    }
+    rt {
+      margin-block: 1px;
     }
     .head-note {
       color: var(--muted);
@@ -801,7 +802,7 @@
       if (last < src.length) {
         out += highlightText(src.slice(last), query);
       }
-      out = out.replace('{', '<sub>').replace('}', '</sub>');
+      out = out.replace(/\{([^{}]*?)\}/g, '<sub>$1</sub>');
       return out;
     }
 

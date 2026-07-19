@@ -36,7 +36,7 @@ jobs:
 
       - name: Deploy to SF
         run: |
-          sshpass -p '${{ secrets.SF_PASSWORD }}' scp -o StrictHostKeyChecking=no docs/index.html ${{ secrets.SF_USERNAME }}@web.sourceforge.net:/home/project-web/jianghuaidict/htdocs
+          sshpass -p '${{ secrets.SF_PASSWORD }}' scp -o StrictHostKeyChecking=no docs/index.html ${{ secrets.SF_USERNAME }}@web.sourceforge.net:/home/project-web/jianghuaidict/htdocs || echo "ignore"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
