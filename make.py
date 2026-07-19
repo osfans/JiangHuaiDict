@@ -11,6 +11,7 @@ OUTPUT = ROOT / "docs" / "index.html"
 TEMPLATE = ROOT / "template.html"
 
 HEAD_RE = re.compile(r"^(?:【[^】]+】)+")
+INLINE_WORD_MEAN_RE = re.compile(r"^([^【】]+)\((.+)\)$")
 WORD_RE = re.compile(r"【([^】]+)】")
 PINYIN_RE = re.compile(r"^([a-z\[][a-z0-9 ,;/\-\[\]]*)")
 
@@ -145,8 +146,11 @@ def load_entries():
             inline_groups = len(groups) >= 1
             if not inline_groups: groups = [raw_line]
             for group in groups:
-                if inline_groups and not HEAD_RE.match(group):
-                    group = f"【{group}】"
+                if inline_groups:
+                    if INLINE_WORD_MEAN_RE.match(group):
+                        group = INLINE_WORD_MEAN_RE.sub(r"【\1】\2", group)
+                    elif not HEAD_RE.match(group):
+                        group = f"【{group}】"
                 if is_tsv:
                     entry = parse_tsv(group, dialect)
                 else:
