@@ -156,11 +156,10 @@ def load_entries():
                     entries[-1]["heads"] += entry["heads"]
                     entries[-1]["pinyin"] += entry["pinyin"]
                     continue
-                if (entry["explanation"] or len(entry["heads"][0]) != 1):
-                    if str(entry) not in uniq:
-                        entries.append(entry)
-                        dialect_entry_counts[dialect] = dialect_entry_counts.get(dialect, 0) + 1
-                    uniq.add(str(entry))
+                if str(entry) not in uniq:
+                    entries.append(entry)
+                    dialect_entry_counts[dialect] = dialect_entry_counts.get(dialect, 0) + 1
+                uniq.add(str(entry))
 
     for dialect in dialects:
         count = dialect_entry_counts.get(dialect, 0)
