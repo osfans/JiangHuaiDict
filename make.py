@@ -124,19 +124,26 @@ def load_entries():
         dialects.append(n)
         dialect_entry_counts.setdefault(n, 0)
 
-    for md_path in sorted(ROOT.glob("[0-9]*.*")):
-        is_tsv = md_path.suffix == ".tsv"
-        dialect = md_path.stem.lstrip("0123456789")
+    contents = open("README.md", "r", encoding="utf-8").read()
+    infos = []
+    for line in contents.splitlines():
+        if not line.startswith("|"): continue
+        parts = line.strip("|").split("|")
+        if "." not in parts[0]: continue
+        if len(parts) >= 3:
+            file_name = parts[0].strip()
+            dialect_name = parts[1].strip()
+            book_name = parts[2].strip()
+            author_name = parts[3].strip() if len(parts) > 3 else ""
+        infos.append((file_name, dialect_name, book_name, author_name))
+    for file_name, dialect, book, author in infos:
+        is_tsv = file_name.endswith(".tsv")
         add_dialect(dialect)
+        md_path = ROOT / file_name
         text = md_path.read_text(encoding="utf-8", errors="ignore")
         lines = text.splitlines()
-
-        first_line = lines[0].strip() if lines else ""
-        book = strip_reference_prefix(first_line)
-        second_line = lines[1].strip() if len(lines) > 1 else ""
-        for tag in re.findall(r"〔([^〕]+)〕", second_line):
+        for tag in re.findall(r"〔([^〕]+)〕", author):
             add_dialect(tag)
-        author = second_line if second_line else ""
         if book or author:
             references[dialect] = {"book": book, "author": author}
 
