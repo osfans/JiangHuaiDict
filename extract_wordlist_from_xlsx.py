@@ -11,7 +11,7 @@ cc = OpenCC("t2s")
 ROOT = Path(__file__).resolve().parent
 SOURCE_XLSX = ROOT / "淮語詞典230301initial.xlsx"
 OUTPUT_MD = ROOT / "000词表.md"
-
+README = ROOT / "README.md"
 
 def as_text(value) -> str:
     if value is None:
@@ -34,7 +34,7 @@ def build_wordlist() -> list[str]:
     }
     place_count = defaultdict(int)
 
-    lines: list[str] = [f"# {SOURCE_XLSX.name}", ""]
+    lines: list[str] = []
 
     isLiangci = False
     for row in range(2, max_row + 1):
@@ -73,8 +73,11 @@ def build_wordlist() -> list[str]:
 
         parts = [f"{''.join(f'〔{p}〕' for p in places)}{exp}" for places, exp in merged_parts]
         lines.append(f"【{head}】{''.join(parts)}  ")
-    lines[1] = f"{''.join(f'〔{place}〕{count}' for place, count in place_count.items())}"
-
+    contents = README.read_text(encoding="utf-8").strip().split("\n")
+    fields = contents[4].split("|")
+    fields[4] = f"{''.join(f'〔{place}〕{count}' for place, count in place_count.items())}"
+    contents[4] = "|".join(fields)
+    README.write_text("\n".join(contents), encoding="utf-8", newline="\n")
     return lines
 
 
